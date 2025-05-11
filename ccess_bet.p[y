@@ -1,0 +1,142 @@
+{
+    "status": 1,
+    "error": {
+        "code": 0,
+        "message": ""
+    },
+    "data": [
+        {
+            "BAL": {
+                "VAL": 721.8613,
+                "CUR": "NGN",
+                "BONUS": 0
+            },
+            "BETLINES": {
+                "592862875$S_1X2_2": {
+                    "BLID": null,
+                    "ID": "592862875$S_1X2_2",
+                    "EID": "592862875",
+                    "ODD": 3.25,
+                    "B": 0,
+                    "S": "1X2 2",
+                    "hnd": "",
+                    "EC": "2621",
+                    "E": "SK Benatky Nad Jizerou - Hradec Kralove B",
+                    "SID": 1,
+                    "SNAME": null,
+                    "SGID": 11491,
+                    "SGNAME": null,
+                    "GID": 1376648,
+                    "GN": "CFL",
+                    "MK": "1X2",
+                    "MKCAT": "POPULAR",
+                    "SGN": "2",
+                    "STD": "2025-05-11 15:00:00",
+                    "F": null,
+                    "L": 0,
+                    "PRV": 0
+                }
+            },
+            "BST": 3,
+            "COUT": null,
+            "DT": "2025-05-11 14:25:21",
+            "FIXED": null,
+            "ISLIVE": 0,
+            "ISOLCOUPONID": 11086560388,
+            "PARENTCOUPONID": "B9UJ573921321XZ-13708143",
+            "SRC": 1,
+            "SUBBETS": {
+                "SB0": {
+                    "ID": 11086560388,
+                    "LIVE": 0,
+                    "BST": 3,
+                    "T": 1,
+                    "S": 10,
+                    "NUM": 1,
+                    "RISK": 32.5,
+                    "PWINMAX": 32.5,
+                    "PWINMIN": 32.5,
+                    "BMAX": "0",
+                    "BMIN": "0",
+                    "OMIN": 3.25,
+                    "OMAX": 3.25,
+                    "WIN": 0,
+                    "FIXED": [],
+                    "LINES": {
+                        "592862875$S_1X2_2": 3.25
+                    },
+                    "AUTOSET": null,
+                    "DT": "2025-05-11 14:25:21",
+                    "CLIENT": {
+                        "ID": "13708143",
+                        "UN": "Suleybawa",
+                        "N": "SULEIMAN",
+                        "SK": "201",
+                        "AGID": "5282290",
+                        "IMP": 0,
+                        "SN": "BAWA",
+                        "NET": "144076",
+                        "TY": "1",
+                        "SID": null,
+                        "CUR": "NGN",
+                        "LANG": "en"
+                    },
+                    "EXTRAINFO": {
+                        "DELAY": 0,
+                        "REQID": "aCCzUTENu4DqkW2_Do2stQAAAAM"
+                    }
+                }
+            },
+            "STATUS": "OK",
+            "TAX": {
+                "TX_PRC": 0,
+                "TX_VAL": 0,
+                "TX_EB": 0,
+                "TX_EB_PRC": 0
+            },
+            "TOTSTAKE": 10,
+            "TOTSTAKEEURO": 0,
+            "TOTWIN": 0,
+            "TOTWINEURO": 0,
+            "TOTBONUSMAX": 0,
+            "TOTBONUSMIN": 0,
+            "TOTOMAX": 0,
+            "TOTOMIN": 0,
+            "TOTPOTWIN": 32.5,
+            "TOTPOTWINMAX": 32.5,
+            "TOTPOTWINMAXEURO": 0,
+            "TOTPOTWINMIN": 32.5,
+            "TOTPOTWINMINEURO": 0,
+            "TOTPOTWINNET": 32.5,
+            "CLIENT": {
+                "ID": "13708143",
+                "UN": "Suleybawa",
+                "N": "SULEIMAN",
+                "SK": "201",
+                "AGID": "5282290",
+                "IMP": 0,
+                "SN": "BAWA",
+                "NET": "144076",
+                "TY": "1",
+                "SID": null,
+                "CUR": "NGN",
+                "LANG": "en"
+            },
+            "FREEBETWON": false,
+            "ORIGINALPOTWINNING": 32.5,
+            "ISBOOMED": false,
+            "BETBOOMMULTIPLIER": 0,
+            "LIVEDELAYSECONDS": null,
+            "EXTRAINFO": {
+                "DELAY": 0,
+                "REQID": "aCCzUTENu4DqkW2_Do2stQAAAAM"
+            }
+        }
+    ]
+}
+
+
+
+
+
+{"BETS":[{"BSTYPE":3,"TAB":3,"NUMLINES":1,"COMB":1,"TYPE":1,"STAKE":10,"POTWINMIN":32.5,"POTWINMAX":32.5,"BONUSMIN":"0","BONUSMAX":"0","ODDMIN":"3.25","ODDMAX":"3.25","ODDS":{"592862875$S_1X2_2":"3.25"},"FIXED":{}}],"IMPERSONIZE":0}
