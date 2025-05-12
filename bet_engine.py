@@ -26,8 +26,63 @@ class BetEngine(WebsiteOpener):
         sleep(10)
         self.__cookie_jar = {cookie["name"]: cookie["value"] for cookie in self.driver.get_cookies()}
     def __place_bet(self, shaped_data):
-        bet_data=shaped_data
-        response=requests.post(f"{self.__bet_api_host}/sportsbook/placebet/PlacebetV2?source=desktop&v_cache_version=1.274.3.186",json=bet_data,cookies=self.__cookie_jar)
+        """ Bet Data Template 
+        {
+        'BETSLIP': 
+        '{
+        "BETS":[{"BSTYPE":3,
+        "TAB":3,
+        "NUMLINES":1,
+        "COMB":1,
+        "TYPE":1,
+        "STAKE":10,
+        "POTWINMIN":32.5,
+        "POTWINMAX":32.5,
+        "BONUSMIN":"0",
+        "BONUSMAX":"0",
+        "ODDMIN":"3.25",
+        "ODDMAX":"3.25",
+        "ODDS":{"592862875$S_1X2_2":"3.25"},
+        "FIXED":{}}],
+        "IMPERSONIZE":0}',
+'BONUS': '0',
+'ACCEPT_ODDS_CHANGES': '1',
+'IS_PASSBET': '0',
+'IS_FIREBETS': '0',
+'IS_CUT1': '0'}
+        """
+        bet_data= {
+        'BETSLIP': 
+        '''{
+        "BETS":[{"BSTYPE":3,
+        "TAB":3,
+        "NUMLINES":1,
+        "COMB":1,
+        "TYPE":1,
+        "STAKE":10,
+        "POTWINMIN":32.5,
+        "POTWINMAX":32.5,
+        "BONUSMIN":"0",
+        "BONUSMAX":"0",
+        "ODDMIN":"3.25",
+        "ODDMAX":"3.25",
+        "ODDS":{"592862875$S_1X2_2":"3.25"},
+        "FIXED":{}}],
+        "IMPERSONIZE":0}''',
+'BONUS': '0',
+'ACCEPT_ODDS_CHANGES': '1',
+'IS_PASSBET': '0',
+'IS_FIREBETS': '0',
+'IS_CUT1': '0'}
+        headers={
+                "User-Agent":"Zeus",
+                "Accept":"*/*",
+                "Cache-Control":"no-cache",
+                "Host":"apigw.bet9ja.com",
+                "Accept-Encoding":"gzip, deflate, br",
+    "Connection":"keep-alive",
+        }
+        response=requests.post(f"{self.__bet_api_host}/sportsbook/placebet/PlacebetV2?source=desktop&v_cache_version=1.274.3.186",json=bet_data,cookies=self.__cookie_jar,headers=headers)
         if response.status_code==401:
             self.__do_login()
             self.__place_bet(shaped_data)
