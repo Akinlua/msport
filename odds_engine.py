@@ -20,12 +20,11 @@ class OddsEngine:
         self.__processed_alerts = set()  # Keep track of processed alert IDs
 
     def get_odds(self):
-        current_time = int(time.time())
+        current_time = int(time.time()*1000)
         response = requests.get(
-            f"{self.__host}/alerts/{self.__user_id}?dropNotificationsCursor={current_time-60*10}-0"
+            f"{self.__host}/alerts/{self.__user_id}?dropNotificationsCursor={current_time-60*10*1000}-0"
         )
         data = response.json()
-        print(data['data'][0])
         shaped_data = {
             "game": {
                 "home": "",
@@ -46,9 +45,8 @@ class OddsEngine:
             # Skip if we've already processed this alert or if it's older than our last processed timestamp
             alert_timestamp = int(alert["timestamp"])
             alert_id = alert["eventId"]
-            
-            if (alert_id in self.__processed_alerts or 
-                alert_timestamp <= self.__last_processed_timestamp):
+            if (alert_id in self.__processed_alerts):
+                print("here")
                 continue
 
             # Skip alerts for matches that have already started
