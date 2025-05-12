@@ -22,12 +22,10 @@ class OddsEngine:
     def get_odds(self):
         current_time = int(time.time())
         response = requests.get(
-            f"{self.__host}/alerts/{self.__user_id}?dropNotificationsCursor={current_time-60*5}"  # Last 5 minutes
-            f"&limitChangeNotificationsCursor={current_time-60*5}"
-            f"&openingLineNotificationsCursor={current_time-60*5}"
+            f"{self.__host}/alerts/{self.__user_id}?dropNotificationsCursor={current_time-60*10}-0"
         )
         data = response.json()
-        print(data['data'][-1])
+        print(data['data'][0])
         shaped_data = {
             "game": {
                 "home": "",
@@ -47,7 +45,7 @@ class OddsEngine:
         for alert in data["data"]:
             # Skip if we've already processed this alert or if it's older than our last processed timestamp
             alert_timestamp = int(alert["timestamp"])
-            alert_id = alert["id"]
+            alert_id = alert["eventId"]
             
             if (alert_id in self.__processed_alerts or 
                 alert_timestamp <= self.__last_processed_timestamp):
