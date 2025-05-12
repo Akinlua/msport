@@ -25,6 +25,7 @@ class OddsEngine:
             f"{self.__host}/alerts/{self.__user_id}?dropNotificationsCursor={current_time-60*10*1000}-0"
         )
         data = response.json()
+        print(data['data'][-1])
         shaped_data = {
             "game": {
                 "home": "",
@@ -38,7 +39,8 @@ class OddsEngine:
                    "value_of_under_over": None,
                 }   
             },
-            "match_type": ""
+            "match_type": "",
+            "noVigPrice": 0,
         }
 
         for alert in data["data"]:
@@ -60,6 +62,7 @@ class OddsEngine:
             shaped_data["category"]["type"] = alert["lineType"]
             shaped_data["category"]["meta"]["value"] = alert["points"]
             shaped_data["category"]["meta"]["team"] = alert["outcome"]
+            shaped_data["noVigPrice"] = alert["noVigPrice"]
             
             try:
                 if float(alert["priceHome"]) > 0:
@@ -91,6 +94,7 @@ class OddsEngine:
     def __notify_betengine(self, shaped_data):
         self.betEngine.notify(shaped_data)
 
+    @staticmethod
     def __calculateEv(odds, no_vig_price):
         """
         Calculate the Expected Value (EV) percentage for a bet.
