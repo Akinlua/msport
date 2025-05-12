@@ -59,7 +59,7 @@ class BetEngine(WebsiteOpener):
         sleep(10)
         self.__cookie_jar = {cookie["name"]: cookie["value"] for cookie in self.driver.get_cookies()}
 
-    def __get_bet_odds(self, shaped_data):
+    def __get_bet_odds(self, shaped_data, stake=10):
         """Calculate odds based on shaped_data"""
         # This is a placeholder - you'll need to implement the actual odds calculation
         # based on your betting platform's API or requirements
@@ -81,7 +81,7 @@ class BetEngine(WebsiteOpener):
     def __place_bet(self, shaped_data):
         """Place bet using the shaped data"""
         # Get odds information
-        odds_info = self.__get_bet_odds(shaped_data)
+        odds_info = self.__get_bet_odds(shaped_data, stake=10)
         if not odds_info:
             print("Could not calculate odds for the given bet")
             return
