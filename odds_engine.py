@@ -16,86 +16,88 @@ class OddsEngine:
         self.betEngine = betEngine
         self.__host = host
         self.__user_id = user_id
+        self.__last_processed_timestamp = int(time.time()) * 1000  # Convert to milliseconds
+        self.__processed_alerts = set()  # Keep track of processed alert IDs
 
     def get_odds(self):
-        response = requests.get(f"{self.__host}/alerts/{self.__user_id}?dropNotificationsCursor={int(time.time())}&limitChangeNotificationsCursor={int(time.time())}&openingLineNotificationsCursor={int(time.time())}")
-        data=response.json()
-        sample_data=        {
-            "id": "1746985490673-0",
-            "sportId": "1",
-            "minDropPercent": "15",
-            "timeIntervalMs": "210000",
-            "maxTimeToMatchStartMs": "21600000",
-            "lowerBoundOdds": "1.5",
-            "upperBoundOdds": "2.4",
-            "nickname": "Soccer(<2.4)",
-            "includeMoneyline": "1",
-            "includeSpreads": "1",
-            "includeTotals": "1",
-            "percentageChange": "15.505500261917234",
-            "changeFrom": "1.909",
-            "changeTo": "1.613",
-            "eventId": "1609349687",
-            "periodNumber": "0",
-            "lineType": "spread",
-            "points": "-1",
-            "outcome": "home",
-            "timestamp": "1746985490523",
-            "leagueName": "Argentina - Torneo Federal A",
-            "home": "Club Villa Mitre",
-            "away": "Kimberley Mar del Plata",
-            "noVigPrice": "",
-            "starts": "1746988200000",
-            "type": "oddsDrop",
-            "alertingCriteriaId": "alertingCriteria:ug8i4f3wxkkhq5vvmzgx936m",
-            "userId": "user_2VqFOsEjFG0YgEAhZDvFe4QE6yf",
-            "lowerBoundLimit": "150",
-            "upperBoundLimit": "1000000",
-            "includeOrExcludeCompetitions": "include",
-            "enabled": "1",
-            "changeDirection": "increase",
-            "includePeriod0": "1",
-            "includePeriod1": "1",
-            "priceHome": "1.613",
-            "priceAway": "2.18"
-        }
-        shaped_data={
-            "game":{
-                "home":"",
-                "away":"",
+        current_time = int(time.time())
+        response = requests.get(
+            f"{self.__host}/alerts/{self.__user_id}?dropNotificationsCursor={current_time-60*5}"  # Last 5 minutes
+            f"&limitChangeNotificationsCursor={current_time-60*5}"
+            f"&openingLineNotificationsCursor={current_time-60*5}"
+        )
+        data = response.json()
+        
+        shaped_data = {
+            "game": {
+                "home": "",
+                "away": "",
             },
-            "category":{
-                "type":"",
-                "meta":{
+            "category": {
+                "type": "",
+                "meta": {
                    "value": None,
                    "team": None, 
                    "value_of_under_over": None,
                 }   
             },
-        "match_type":""
+            "match_type": ""
         }
+
         for alert in data["data"]:
-            shaped_data["game"]["home"]=alert["home"]
-            shaped_data["game"]["away"]=alert["away"]
-            shaped_data["category"]["type"]=alert["lineType"]
-            shaped_data["category"]["meta"]["value"]=alert["points"]
-            shaped_data["category"]["meta"]["team"]=alert["outcome"]
+            # Skip if we've already processed this alert or if it's older than our last processed timestamp
+            alert_timestamp = int(alert["timestamp"])
+            alert_id = alert["id"]
+            
+            if (alert_id in self.__processed_alerts or 
+                alert_timestamp <= self.__last_processed_timestamp):
+                continue
+
+            # Skip alerts for matches that have already started
+            current_time_ms = int(time.time() * 1000)
+            match_start_time = int(alert["starts"])
+            if match_start_time <= current_time_ms:
+                continue
+
+            shaped_data["game"]["home"] = alert["home"]
+            shaped_data["game"]["away"] = alert["away"]
+            shaped_data["category"]["type"] = alert["lineType"]
+            shaped_data["category"]["meta"]["value"] = alert["points"]
+            shaped_data["category"]["meta"]["team"] = alert["outcome"]
+            
             try:
-                shaped_data["category"]["meta"]["value_of_under_over"]=f"+{alert["priceHome"]}"
+                if float(alert["priceHome"]) > 0:
+                    shaped_data["category"]["meta"]["value_of_under_over"] = f"+{alert['priceHome']}"
+                else:
+                    shaped_data["category"]["meta"]["value_of_under_over"] = str(alert["priceHome"])
             except:
                 try:
-                    shaped_data["category"]["meta"]["value_of_under_over"]=f"-{alert["priceAway"]}"
+                    if float(alert["priceAway"]) > 0:
+                        shaped_data["category"]["meta"]["value_of_under_over"] = f"+{alert['priceAway']}"
+                    else:
+                        shaped_data["category"]["meta"]["value_of_under_over"] = str(alert["priceAway"])
                 except:
-                    shaped_data["category"]["meta"]["value_of_under_over"]=None
-            shaped_data["match_type"]=alert["type"]
-            self.__notify_betengine(shaped_data)
+                    shaped_data["category"]["meta"]["value_of_under_over"] = None
+            
+            shaped_data["match_type"] = alert["type"]
+            
+            # Process the alert
+            self.__notify_betengine(shaped_data.copy())  # Send a copy to avoid reference issues
+            
+            # Update tracking
+            self.__processed_alerts.add(alert_id)
+            self.__last_processed_timestamp = max(self.__last_processed_timestamp, alert_timestamp)
+
+            # Limit the size of processed alerts set to prevent memory growth
+            if len(self.__processed_alerts) > 1000:
+                self.__processed_alerts = set(list(self.__processed_alerts)[-1000:])
 
     def __notify_betengine(self, shaped_data):
         self.betEngine.notify(shaped_data)
 
-
-
 if __name__=="__main__":
     """ Tester"""
     oddsEngine = OddsEngine()
-    oddsEngine.get_odds()
+    while True:
+        oddsEngine.get_odds()
+        time.sleep(60)  # Check every minute
