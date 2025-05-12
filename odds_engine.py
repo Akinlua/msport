@@ -8,6 +8,9 @@ class BetEngine:
     def __init__(self,):
         pass
 
+    def notify(self, shaped_data):
+        print(shaped_data)
+
 class OddsEngine:
     def __init__(self,betEngine=BetEngine(),host=os.getenv("PINNACLE_ODDS_HOST"),user_id=os.getenv("PINNACLE_USER_ID")):
         self.betEngine = betEngine
@@ -95,4 +98,4 @@ class OddsEngine:
 if __name__=="__main__":
     """ Tester"""
     oddsEngine = OddsEngine()
-    print(oddsEngine.get_odds())
+    oddsEngine.get_odds()

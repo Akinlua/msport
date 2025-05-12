@@ -14,8 +14,31 @@ class BetEngine(WebsiteOpener):
         self.__bet_api_host=bet_api_host
         self.__bet_host=bet_host
         self.__cookie_jar=None
+        self.__headers= headers = {
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "application/json, text/plain, */*",
+            "Cache-Control": "no-cache",
+            "Host": "apigw.bet9ja.com",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Origin": self.__bet_host,
+            "Referer": f"{self.__bet_host}/"
+        }
         self.__do_login()
 
+    def __get_bet_id(self, shaped_data):
+        """Get bet id from bet9ja"""
+        data= urllib.parse.quote(f"TERM={shaped_data['game']['home']} {shaped_data['game']['away']}&START=0&ROWS=100000&ISCOMPETITION=0&ISEVENT=1&ISTEAM=0&GROUPBYFIELD=sp_id&GROUPBYLIMIT=11&")
+        encoded_data=data#urllib.parse.urlencode(data)
+        response = requests.post(
+            f"{self.__bet_api_host}/sportsbook/search/SearchV2?source=desktop&v_cache_version=1.274.3.187",
+            data=encoded_data,
+            cookies=self.__cookie_jar,
+            headers=self.__headers
+        )
+        print(response.json())
+        
     def __do_login(self):
         username=os.getenv("BETNAIJA_USERNAME")
         password=os.getenv("BETNAIJA_PASSWORD")
@@ -34,11 +57,12 @@ class BetEngine(WebsiteOpener):
         # based on your betting platform's API or requirements
         category_type = shaped_data['category']['type']
         meta = shaped_data['category']['meta']
-        
+        id=self.__get_bet_id(shaped_data)
+        print(id)
         # Example odds calculation - replace with actual logic
         if category_type == 'spread':
             odds_value = 3.25  # This should be fetched from your odds API
-            market_id = "592862875$S_1X2_2"  # This should be fetched from your odds API
+            market_id = f"1609312504$S_1X2_2"  # This should be fetched from your odds API
             return {
                 "odds_value": odds_value,
                 "market_id": market_id,
@@ -93,26 +117,13 @@ class BetEngine(WebsiteOpener):
         # URL encode the form data
         encoded_data = urllib.parse.urlencode(form_data)
 
-        headers = {
-            "User-Agent": "Mozilla/5.0",
-            "Accept": "application/json, text/plain, */*",
-            "Cache-Control": "no-cache",
-            "Host": "apigw.bet9ja.com",
-            "Accept-Encoding": "gzip, deflate, br",
-            "Connection": "keep-alive",
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Origin": self.__bet_host,
-            "Referer": f"{self.__bet_host}/"
-        }
 
-        try:
-            print("Sending request with data:", encoded_data)
-            
+        try:  
             response = requests.post(
                 f"{self.__bet_api_host}/sportsbook/placebet/PlacebetV2?source=desktop&v_cache_version=1.274.3.186",
                 data=encoded_data,
                 cookies=self.__cookie_jar,
-                headers=headers
+                headers=self.__headers
             )
 
 
@@ -151,8 +162,8 @@ if __name__ == "__main__":
     bet_engine = BetEngine()
     test_data = {
         "game": {
-            "home": "Manchester United",
-            "away": "Liverpool"
+            "away": "Manchester Utd",
+            "home": "Chelsea"
         },
         "category": {
             "type": "spread",
