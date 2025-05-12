@@ -27,7 +27,7 @@ class OddsEngine:
             f"&openingLineNotificationsCursor={current_time-60*5}"
         )
         data = response.json()
-        
+        print(data['data'][-1])
         shaped_data = {
             "game": {
                 "home": "",
@@ -98,6 +98,4 @@ class OddsEngine:
 if __name__=="__main__":
     """ Tester"""
     oddsEngine = OddsEngine()
-    while True:
-        oddsEngine.get_odds()
-        time.sleep(60)  # Check every minute
+    oddsEngine.get_odds()
