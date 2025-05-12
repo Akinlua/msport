@@ -29,15 +29,23 @@ class BetEngine(WebsiteOpener):
 
     def __get_bet_id(self, shaped_data):
         """Get bet id from bet9ja"""
-        data= urllib.parse.quote(f"TERM={shaped_data['game']['home']} {shaped_data['game']['away']}&START=0&ROWS=100000&ISCOMPETITION=0&ISEVENT=1&ISTEAM=0&GROUPBYFIELD=sp_id&GROUPBYLIMIT=11&")
+        data= f"TERM={urllib.parse.quote(shaped_data['game']['home'] + ' ' + shaped_data['game']['away'])} &START=0&ROWS=100000&ISCOMPETITION=0&ISEVENT=1&ISTEAM=0&GROUPBYFIELD=sp_id&GROUPBYLIMIT=11&"
         encoded_data=data#urllib.parse.urlencode(data)
+        print(encoded_data)
         response = requests.post(
             f"{self.__bet_api_host}/sportsbook/search/SearchV2?source=desktop&v_cache_version=1.274.3.187",
             data=encoded_data,
             cookies=self.__cookie_jar,
             headers=self.__headers
         )
-        print(response.json())
+        data=response.json()['D']['S']['1']
+        players_soccer=response.json()['D']['S']['301']
+        #print(data)
+        #print(data['E'])
+        id=data['E'][0]['ID']
+        excluded_bonus=data['E'][0]['EXCLUDED_BONUS']
+        odds=data['E'][0]['O']
+        return {"id":id,"excluded_bonus":excluded_bonus,"odds":odds}
         
     def __do_login(self):
         username=os.getenv("BETNAIJA_USERNAME")
@@ -51,29 +59,29 @@ class BetEngine(WebsiteOpener):
         sleep(10)
         self.__cookie_jar = {cookie["name"]: cookie["value"] for cookie in self.driver.get_cookies()}
 
-    def __get_bet_odds(self, shaped_data):
+    def __get_bet_odds(self, shaped_data, stake=10):
         """Calculate odds based on shaped_data"""
         # This is a placeholder - you'll need to implement the actual odds calculation
         # based on your betting platform's API or requirements
         category_type = shaped_data['category']['type']
         meta = shaped_data['category']['meta']
-        id=self.__get_bet_id(shaped_data)
+        id=self.__get_bet_id(shaped_data)['id']
         print(id)
         # Example odds calculation - replace with actual logic
         if category_type == 'spread':
             odds_value = 3.25  # This should be fetched from your odds API
-            market_id = f"1609312504$S_1X2_2"  # This should be fetched from your odds API
+            market_id = f"{id}$S_1X2_2"  # This should be fetched from your odds API
             return {
                 "odds_value": odds_value,
                 "market_id": market_id,
-                "stake": 1  # This could be configurable
+                "stake": 10  # This could be configurable
             }
         return None
 
     def __place_bet(self, shaped_data):
         """Place bet using the shaped data"""
         # Get odds information
-        odds_info = self.__get_bet_odds(shaped_data)
+        odds_info = self.__get_bet_odds(shaped_data, stake=10)
         if not odds_info:
             print("Could not calculate odds for the given bet")
             return
@@ -135,6 +143,10 @@ class BetEngine(WebsiteOpener):
             try:
                 response_data = response.json()
                 print(f"Bet placement response: {response_data}")
+                if(response_data['status']==1):
+                    print(f"\033[92m [+] Bet placed successfully on event {shaped_data['game']['home']} vs {shaped_data['game']['away']}\033[0m")
+                else:
+                    print(f"\033[91m [-] Bet placement failed on event {shaped_data['game']['home']} vs {shaped_data['game']['away']}\033[0m")
                 return response_data
             except json.JSONDecodeError as e:
                 print(f"Failed to decode JSON response: {e}")
