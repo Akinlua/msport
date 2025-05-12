@@ -2,22 +2,36 @@ from selenium_script import *
 import os
 import dotenv
 dotenv.load_dotenv()
+from time import sleep
 import requests
+from selenium.webdriver.common.by import By
 
 class BetEngine(WebsiteOpener):
     def __init__(self, headless=os.getenv("ENVIRONMENT")=="production",bet_host=os.getenv("BETNAIJA_HOST"),bet_api_host=os.getenv("BETNAIJA_API_HOST")):
         super().__init__(headless)
         self.__bet_api_host=bet_api_host
         self.__bet_host=bet_host
+        self.__cookie_jar=None
         self.__do_login()
 
     def __do_login(self):
         username=os.getenv("BETNAIJA_USERNAME")
         password=os.getenv("BETNAIJA_PASSWORD")
-        self.open_url(f"{self.__bet_host}/login")
-
+        self.open_url(f"{self.__bet_host}")
+        self.driver.implicitly_wait(10)
+        self.driver.find_element(By.XPATH, "//*[@id='header_item']/div/div/div/div[2]/div[3]/div[1]").click()
+        self.driver.find_element(By.XPATH, "//*[@id='username']").send_keys(username)
+        self.driver.find_element(By.XPATH, "//*[@id='password']").send_keys(password)
+        self.driver.find_element(By.XPATH, "//*[@id='header_item']/div/div/div/div[2]/div[3]/div[2]/div[1]/div[3]").click()
+        sleep(10)
+        self.__cookie_jar = {cookie["name"]: cookie["value"] for cookie in self.driver.get_cookies()}
     def __place_bet(self, shaped_data):
-        pass
+        bet_data=shaped_data
+        response=requests.post(f"{self.__bet_api_host}/sportsbook/placebet/PlacebetV2?source=desktop&v_cache_version=1.274.3.186",json=bet_data,cookies=self.__cookie_jar)
+        if response.status_code==401:
+            self.__do_login()
+            self.__place_bet(shaped_data)
+        print(response.json())
 
     def notify(self, shaped_data):
         """ Work on the data sent across from the odds engine
@@ -40,7 +54,7 @@ class BetEngine(WebsiteOpener):
         """
         #do the rest, fam
         #make sure to check that bet doesn't exist
-        print(shaped_data)
+        self.__place_bet(shaped_data)
 if __name__ == "__main__":
     """Main Application"""
     bet_engine = BetEngine()
