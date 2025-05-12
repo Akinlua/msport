@@ -9,7 +9,15 @@ class BetEngine(WebsiteOpener):
         super().__init__(headless)
         self.__bet_api_host=bet_api_host
         self.__bet_host=bet_host
-        super().open_url(self.__bet_host)
+        self.__do_login()
+
+    def __do_login(self):
+        username=os.getenv("BETNAIJA_USERNAME")
+        password=os.getenv("BETNAIJA_PASSWORD")
+        self.open_url(f"{self.__bet_host}/login")
+
+    def __place_bet(self, shaped_data):
+        pass
 
     def notify(self, shaped_data):
         """ Work on the data sent across from the odds engine
