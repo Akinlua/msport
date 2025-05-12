@@ -1,2 +1,4 @@
 selenium==4.17.2
 webdriver-manager==4.0.1 
+python-dotenv
+requests
