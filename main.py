@@ -1,98 +1,61 @@
-from selenium_driverless import webdriver
-from selenium_driverless.types.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-import time
+#!/usr/bin/env python3
 import os
-import asyncio
+import signal
+import sys
+import time
 import dotenv
-import datetime
-import glob
-import shutil
-import json
-from bson.objectid import ObjectId
-from selenium.webdriver.common.action_chains import ActionChains
-import requests
+from bet_engine import BetEngine
+from odds_engine import OddsEngine
+
+# Load environment variables
 dotenv.load_dotenv()
 
-async def setup_driver():
-    """Setup and return a driverless Chrome instance"""
-    # Create the download directory if it doesn't exist
-    # Create and return the webdriver
-    options = webdriver.ChromeOptions()
-    if(os.getenv("ENVIRONMENT") == "production"):
-        #make chrome headless
-        options.add_argument("--headless=new")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-gpu")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--window-size=1920,1080")
-        options.add_argument("--disable-blink-features=AutomationControlled")
-    download_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "downloads"))
-    os.makedirs(download_dir, exist_ok=True)
-    print(f"Downloads will be saved to: {download_dir}")
-    
-    # Create a profile directory for Chrome to make settings persistent
-    profile_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "chrome_profile"))
-    os.makedirs(profile_dir, exist_ok=True)
-    print(f"Using Chrome profile at: {profile_dir}")
-    
-    # Add logging preferences
-    options.add_argument("--log-level=3")  # Minimal logging
-    
-    # Use the custom profile directory
-    #options.add_argument(f"--user-data-dir={profile_dir}")
-    
-    # Set download preferences with absolute path - more reliable
-    prefs = {
-        "download.default_directory": download_dir.replace("\\", "/"),  # Use forward slashes
-        "download.prompt_for_download": False,
-        "download.directory_upgrade": True,
-        "safebrowsing.enabled": False,  # Disable safe browsing which can block downloads
-        "plugins.always_open_pdf_externally": True,  # Auto-download PDFs
-        "browser.download.folderList": 2,  # 2 means custom location
-        "browser.helperApps.neverAsk.saveToDisk": "application/pdf,application/x-pdf,application/octet-stream,text/plain,text/html",
-        "browser.download.manager.showWhenStarting": False
-    }
-    options.add_experimental_option("prefs", prefs)
-    
-    # Additional settings for downloads
-    download_dir_escaped = download_dir.replace('\\', '/')
-    options.add_argument(f"--download.default_directory={download_dir_escaped}")
-    
-    # Create the driver
-    driver = await webdriver.Chrome(options=options)
-    
-    # Execute JS to modify download behavior directly in the page context
-    await driver.execute_script("""
-        window.addEventListener('load', function() {
-            // Try to set browser to auto-download files
-            Object.defineProperty(HTMLAnchorElement.prototype, 'download', {
-                get: function() { return true; }
-            });
-        });
-    """)
-    
-    return driver
+def handle_interrupt(signum, frame):
+    """Handle keyboard interrupts gracefully"""
+    print("\nShutting down application...")
+    sys.exit(0)
 
-async def login(driver, credentials=1):
-    await driver.get("https://www.pinnacleoddsdropper.com/terminal", wait_load=True)
-
-
-
-async def main():
-    # Initialize the driver
-    driver = await setup_driver()
+def main():
+    """
+    Main application entry point
+    
+    Initializes the bet engine and odds engine,
+    then starts monitoring for odds alerts
+    """
+    print("Starting BetAlert application...")
     
     try:
-        await login(driver)
-        await driver.sleep(10)
+        # Initialize bet engine
+        print("Initializing bet engine...")
+        bet_engine = BetEngine(
+            headless=os.getenv("ENVIRONMENT") == "production",
+            bet_host=os.getenv("BETNAIJA_HOST"),
+            bet_api_host=os.getenv("BETNAIJA_API_HOST"),
+            min_ev=float(os.getenv("MIN_EV", "0"))
+        )
+        
+        # Initialize odds engine with the bet engine
+        print("Initializing odds engine...")
+        odds_engine = OddsEngine(
+            bet_engine=bet_engine,
+            host=os.getenv("PINNACLE_ODDS_HOST"),
+            user_id=os.getenv("PINNACLE_USER_ID")
+        )
+        
+        # Register interrupt handler for clean shutdown
+        signal.signal(signal.SIGINT, handle_interrupt)
+        
+        # Start monitoring for odds alerts
+        odds_check_interval = int(os.getenv("ODDS_CHECK_INTERVAL", "60"))
+        print(f"Starting odds monitoring with {odds_check_interval} second intervals...")
+        odds_engine.start_monitoring(interval=odds_check_interval)
+        
+    except ValueError as e:
+        print(f"Configuration error: {e}")
+        sys.exit(1)
     except Exception as e:
-        print(f"An error occurred: {e}")
-    
-    finally:
-        # Always close the drivers
-        await driver.quit()
+        print(f"Unexpected error: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
