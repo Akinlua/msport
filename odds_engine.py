@@ -22,7 +22,6 @@ class OddsEngine:
     def __init__(self, bet_engine=None, pinnacle_host=None, pinnacle_api_host=None):
         self.bet_engine = bet_engine if bet_engine else BetEngine()
         self.__host = pinnacle_host or os.getenv("PINNACLE_HOST")
-        self.__api_host = pinnacle_api_host or os.getenv("PINNACLE_API_HOST")
         self.__user_id = os.getenv("PINNACLE_USER_ID")
         self.__last_processed_timestamp = int(time.time()) * 1000  # Convert to milliseconds
         self.__processed_alerts = set()  # Keep track of processed alert IDs
@@ -31,7 +30,7 @@ class OddsEngine:
         self.__monitor_thread = None
         
         # Validate required environment variables
-        if not self.__host or not self.__api_host or not self.__user_id:
+        if not self.__host or not self.__user_id:
             raise ValueError("Pinnacle host, API host, or user ID not found in environment variables")
     
     def start_monitoring(self, interval=60):
@@ -88,7 +87,10 @@ class OddsEngine:
         """
         current_time = int(time.time() * 1000)
         # Look back 10 minutes for alerts
-        lookback_time = current_time - (60 * 10 * 1000)
+        # lookback_time = current_time - (60 * 10 * 1000)
+        lookback_time = 1747423479000
+
+        print(f"Looking back {lookback_time} milliseconds")
         
         try:
             response = requests.get(
@@ -138,6 +140,13 @@ class OddsEngine:
         match_start_time = int(alert.get("starts", 0))
         if match_start_time <= current_time_ms:
             print(f"Skipping alert for match that already started: {alert.get('home', '')} vs {alert.get('away', '')}")
+            return
+        
+        # Skip alerts with "(Corners)" in team names
+        home_team = alert.get("home", "")
+        away_team = alert.get("away", "")
+        if "(Corners)" in home_team or "(Corners)" in away_team:
+            print(f"Skipping corners market: {home_team} vs {away_team}")
             return
             
         # Shape the data for the bet engine

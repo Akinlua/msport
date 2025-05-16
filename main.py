@@ -31,7 +31,6 @@ def main():
         odds_engine = OddsEngine(
             bet_engine=bet_engine,
             pinnacle_host=os.getenv("PINNACLE_HOST"),
-            pinnacle_api_host=os.getenv("PINNACLE_API_HOST")
         )
         
         # Set up signal handler for graceful shutdown
