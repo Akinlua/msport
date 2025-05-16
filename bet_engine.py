@@ -5,14 +5,53 @@ import json
 import re
 import requests
 import dotenv
+import threading
+import queue
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from utils.calculate_no_vig_prices import calculate_no_vig_prices
 from utils.calculate_ev import calculate_ev
+from scipy.optimize import minimize_scalar
+import math
 
 dotenv.load_dotenv()
+
+class BetAccount:
+    """
+    Represents a single Bet9ja account with its own login credentials and cookie jar
+    """
+    def __init__(self, username, password, active=True, max_concurrent_bets=3, min_balance=100):
+        self.username = username
+        self.password = password
+        self.active = active
+        self.max_concurrent_bets = max_concurrent_bets
+        self.min_balance = min_balance
+        self.cookie_jar = None
+        self.current_bets = 0
+        self.last_login_time = 0
+        self.balance = 0
+        
+    def increment_bets(self):
+        self.current_bets += 1
+        
+    def decrement_bets(self):
+        self.current_bets = max(0, self.current_bets - 1)
+        
+    def can_place_bet(self):
+        return (self.active and 
+                self.cookie_jar is not None and 
+                self.current_bets < self.max_concurrent_bets and
+                self.balance >= self.min_balance)
+        
+    def set_cookie_jar(self, cookies):
+        self.cookie_jar = {cookie["name"]: cookie["value"] for cookie in cookies}
+        self.last_login_time = time.time()
+        
+    def needs_login(self, max_session_time=3600):  # 1 hour max session time
+        return (self.cookie_jar is None or 
+                (time.time() - self.last_login_time) > max_session_time)
 
 class BetEngine(WebsiteOpener):
     """
@@ -26,36 +65,155 @@ class BetEngine(WebsiteOpener):
     def __init__(self, headless=os.getenv("ENVIRONMENT")=="production", 
                  bet_host=os.getenv("BETNAIJA_HOST"), 
                  bet_api_host=os.getenv("BETNAIJA_API_HOST"),
-                 min_ev=float(os.getenv("MIN_EV", "0"))):
+                 min_ev=float(os.getenv("MIN_EV", "0")),
+                 config_file="config.json"):
         super().__init__(headless)
         self.__bet_api_host = bet_api_host
         self.__bet_host = bet_host
-        self.__cookie_jar = None
-        self.__min_ev = min_ev  # Minimum EV threshold for placing bets
-        self.__do_login()
+        self.__min_ev = min_ev
+        self.__accounts = []
+        self.__bet_queue = queue.Queue()
+        self.__load_config(config_file)
+        self.__setup_accounts()
+        self.__start_bet_worker()
         
+    def __load_config(self, config_file):
+        """Load configuration from JSON file"""
+        try:
+            with open(config_file, 'r') as f:
+                self.__config = json.load(f)
+                
+            # Update min_ev from config if available
+            if "bet_settings" in self.__config and "min_ev" in self.__config["bet_settings"]:
+                self.__min_ev = float(self.__config["bet_settings"]["min_ev"])
+                
+            print(f"Loaded configuration from {config_file}")
+        except Exception as e:
+            print(f"Error loading config file: {e}")
+            # Create default config
+            self.__config = {
+                "accounts": [],
+                "max_total_concurrent_bets": 5,
+                "bet_settings": {
+                    "min_ev": self.__min_ev,
+                    "kelly_fraction": 0.3,
+                    "min_stake": 10,
+                    "max_stake": 100,
+                    "bankroll": 1000
+                }
+            }
+            
+    def __setup_accounts(self):
+        """Initialize bet accounts from config"""
+        # First, set up at least one account from environment variables if available
+        env_username = os.getenv("BETNAIJA_USERNAME")
+        env_password = os.getenv("BETNAIJA_PASSWORD")
+        
+        if env_username and env_password:
+            self.__accounts.append(BetAccount(env_username, env_password))
+            
+        # Then add accounts from config
+        if "accounts" in self.__config:
+            for account_data in self.__config["accounts"]:
+                # Skip if username/password is missing or account already exists
+                if not account_data.get("username") or not account_data.get("password"):
+                    continue
+                    
+                # Check if this account is already added from env vars
+                if (env_username and env_password and 
+                    account_data.get("username") == env_username and 
+                    account_data.get("password") == env_password):
+                    continue
+                    
+                self.__accounts.append(BetAccount(
+                    username=account_data.get("username"),
+                    password=account_data.get("password"),
+                    active=account_data.get("active", True),
+                    max_concurrent_bets=account_data.get("max_concurrent_bets", 3),
+                    min_balance=account_data.get("min_balance", 100)
+                ))
+                
+        # Ensure we have at least one account
+        if not self.__accounts:
+            raise ValueError("No betting accounts configured. Please set BETNAIJA_USERNAME and BETNAIJA_PASSWORD environment variables or configure accounts in config.json")
+            
+        print(f"Set up {len(self.__accounts)} betting accounts")
+        
+        # Login to the first account for search functionality
+        if self.__accounts:
+            self.__do_login_for_account(self.__accounts[0])
+            
+    def __start_bet_worker(self):
+        """Start a worker thread to process bet queue"""
+        self.__worker_thread = threading.Thread(target=self.__process_bet_queue, daemon=True)
+        self.__worker_thread.start()
+        
+    def __process_bet_queue(self):
+        """Process bets from the queue"""
+        while True:
+            try:
+                # Get bet data from queue
+                bet_data = self.__bet_queue.get()
+                
+                # Place bet with available accounts
+                self.__place_bet_with_available_account(bet_data)
+                
+                # Mark task as done
+                self.__bet_queue.task_done()
+                
+            except Exception as e:
+                print(f"Error in bet worker thread: {e}")
+                
+            # Small sleep to prevent CPU hogging
+            time.sleep(0.1)
+
     def __do_login(self):
-        """Log in to Bet9ja website"""
-        print("Logging in to Bet9ja...")
-        username = os.getenv("BETNAIJA_USERNAME")
-        password = os.getenv("BETNAIJA_PASSWORD")
+        """Log in to Bet9ja website with the first account (for search functionality)"""
+        if self.__accounts:
+            self.__do_login_for_account(self.__accounts[0])
+        else:
+            raise ValueError("No betting accounts configured")
+            
+    def __do_login_for_account(self, account):
+        """Log in to Bet9ja website with a specific account"""
+        print(f"Logging in to Bet9ja with account: {account.username}")
         
-        if not username or not password:
-            raise ValueError("Bet9ja username or password not found in environment variables")
+        if not account.username or not account.password:
+            raise ValueError("Bet9ja username or password not found for account")
             
         self.open_url(f"{self.__bet_host}")
         self.driver.implicitly_wait(10)
         
         try:
             self.driver.find_element(By.XPATH, "//*[@id='header_item']/div/div/div/div[2]/div[3]/div[1]").click()
-            self.driver.find_element(By.XPATH, "//*[@id='username']").send_keys(username)
-            self.driver.find_element(By.XPATH, "//*[@id='password']").send_keys(password)
+            self.driver.find_element(By.XPATH, "//*[@id='username']").send_keys(account.username)
+            self.driver.find_element(By.XPATH, "//*[@id='password']").send_keys(account.password)
             self.driver.find_element(By.XPATH, "//*[@id='header_item']/div/div/div/div[2]/div[3]/div[2]/div[1]/div[3]").click()
             time.sleep(5)
-            self.__cookie_jar = {cookie["name"]: cookie["value"] for cookie in self.driver.get_cookies()}
-            print("Login successful")
+            
+            # Store cookies in the account
+            account.set_cookie_jar(self.driver.get_cookies())
+            
+            # If this is the first account, also store cookies in the class for search functionality
+            if self.__accounts and account == self.__accounts[0]:
+                self.__cookie_jar = account.cookie_jar
+                
+            # Try to get account balance
+            try:
+                balance_element = self.driver.find_element(By.XPATH, "//div[contains(@class, 'balance')]")
+                balance_text = balance_element.text.strip()
+                # Extract numeric value from balance text
+                balance_value = re.search(r'[\d,.]+', balance_text)
+                if balance_value:
+                    # Remove commas and convert to float
+                    account.balance = float(balance_value.group().replace(',', ''))
+                    print(f"Account balance: {account.balance}")
+            except Exception as e:
+                print(f"Could not retrieve account balance: {e}")
+                
+            print(f"Login successful for account: {account.username}")
         except Exception as e:
-            print(f"Login failed: {e}")
+            print(f"Login failed for account: {account.username}: {e}")
             raise
 
     def __search_event(self, home_team, away_team):
@@ -100,10 +258,13 @@ class BetEngine(WebsiteOpener):
             }
             
             try:
+                # Use the first account's cookie jar for searching
+                cookies = self.__cookie_jar
+                
                 response = requests.post(
                     f"{self.__bet_api_host}/sportsbook/search/SearchV2?source=desktop&v_cache_version=1.274.3.186",
                     data=form_data,
-                    cookies=self.__cookie_jar,
+                    cookies=cookies,
                     headers=headers
                 )
                 
@@ -147,10 +308,13 @@ class BetEngine(WebsiteOpener):
         }
         
         try:
-            response = requests.post(
-                f"{self.__bet_api_host}/sportsbook/PalimpsestAjax/GetEvent?EVENTID={event_id}&v_cache_version=1.274.3.186",
+            # Use the first account's cookie jar for getting event details
+            cookies = self.__cookie_jar
+            
+            response = requests.get(
+                f"{self.__bet_host}/desktop/feapi/PalimpsestAjax/GetEvent?EVENTID={event_id}&v_cache_version=1.274.3.186",
                 data=form_data,
-                cookies=self.__cookie_jar,
+                cookies=cookies,
                 headers=headers
             )
             
@@ -171,243 +335,79 @@ class BetEngine(WebsiteOpener):
             print(f"Error getting event details: {e}")
             return None
 
-    def __find_market_bet_code(self, event_details, line_type, points, outcome, is_first_half=False):
+    def __place_bet_with_available_account(self, bet_data):
         """
-        Find the appropriate bet code in the Bet9ja event details
+        Place a bet using an available account
         
         Parameters:
-        - event_details: The event details from Bet9ja
-        - line_type: The type of bet (spread, moneyline, total)
-        - points: The points value for the bet
-        - outcome: The outcome (home, away, draw, over, under)
-        - is_first_half: Whether the bet is for the first half
-        
-        Returns:
-        - Tuple of (bet_code, odds)
-        """
-        print(f"Finding market for: {line_type} - {outcome} - {points} - First Half: {is_first_half}")
-        
-        if "O" not in event_details:
-            print("No market odds found in event details")
-            return None, None
-        
-        odds_data = event_details["O"]
-        
-        # Handle MONEYLINE bets (1X2 in Bet9ja)
-        if line_type.lower() == "moneyline":
-            # Map outcome to Bet9ja format
-            outcome_map = {"home": "1", "away": "2", "draw": "X"}
-            if outcome.lower() not in outcome_map:
-                print(f"Invalid outcome for moneyline: {outcome}")
-                return None, None
-                
-            bet_outcome = outcome_map[outcome.lower()]
-            
-            # Format: S_1X2_1 for main match, S_1X21T_1 for first half
-            market_prefix = "S_1X21T_" if is_first_half else "S_1X2_"
-            market_key = f"{market_prefix}{bet_outcome}"
-            
-            # Look for exact match
-            for key, odds in odds_data.items():
-                if key.endswith(market_key):
-                    print(f"Found moneyline market: {key} with odds {odds}")
-                    return key, float(odds)
-            
-            print(f"No matching moneyline market found for {outcome}")
-            return None, None
-            
-        # Handle TOTAL bets (Over/Under in Bet9ja)
-        elif line_type.lower() == "total":
-            # Map outcome to Bet9ja format
-            outcome_map = {"over": "O", "under": "U"}
-            if outcome.lower() not in outcome_map:
-                print(f"Invalid outcome for total: {outcome}")
-                return None, None
-                
-            bet_outcome = outcome_map[outcome.lower()]
-            
-            # Normalize points value to Bet9ja format (typically .0 or .5)
-            # First try exact match
-            market_prefix = "S_OU1T@" if is_first_half else "S_OU@"
-            exact_key = f"{market_prefix}{points}_{bet_outcome}"
-            
-            # Look for exact match first
-            for key, odds in odds_data.items():
-                if key.endswith(exact_key):
-                    print(f"Found exact total market: {key} with odds {odds}")
-                    return key, float(odds)
-            
-            # Try to find nearest points
-            closest_point = None
-            closest_key = None
-            closest_odds = None
-            
-            # First try higher values (up to +1.5 from original)
-            for increment in [0.5, 1.0, 1.5]:
-                adj_points = float(points) + increment
-                adj_key = f"{market_prefix}{adj_points}_{bet_outcome}"
-                adj_key_alt = f"{market_prefix}{adj_points:.1f}_{bet_outcome}"  # Try with .0 format
-                
-                for key, odds in odds_data.items():
-                    if key.endswith(adj_key) or key.endswith(adj_key_alt):
-                        print(f"Found higher total market: {key} with odds {odds}")
-                        return key, float(odds)
-            
-            # Then try lower values (down to -1.5 from original)
-            for decrement in [0.5, 1.0, 1.5]:
-                if float(points) - decrement <= 0:
-                    continue  # Skip if points would be negative or zero
-                    
-                adj_points = float(points) - decrement
-                adj_key = f"{market_prefix}{adj_points}_{bet_outcome}"
-                adj_key_alt = f"{market_prefix}{adj_points:.1f}_{bet_outcome}"  # Try with .0 format
-                
-                for key, odds in odds_data.items():
-                    if key.endswith(adj_key) or key.endswith(adj_key_alt):
-                        print(f"Found lower total market: {key} with odds {odds}")
-                        return key, float(odds)
-            
-            print(f"No matching total market found for {points} {outcome}")
-            return None, None
-            
-        # Handle SPREAD bets (Handicap in Bet9ja)
-        elif line_type.lower() == "spread":
-            # Adjust the points for away team (Bet9ja uses 1X2HND@X_YH format)
-            handicap_points = points
-            if outcome.lower() == "away":
-                # Bet9ja represents away handicaps with negative of the original value
-                handicap_points = -float(points)
-            
-            # Map outcome to Bet9ja format
-            outcome_map = {"home": "1H", "away": "2H", "draw": "XH"}
-            if outcome.lower() not in outcome_map:
-                print(f"Invalid outcome for spread: {outcome}")
-                return None, None
-                
-            bet_outcome = outcome_map[outcome.lower()]
-            
-            # Format: S_1X2HND@2_1H for main match, S_1X2HND1T@2_1H for first half
-            market_prefix = "S_1X2HND1T@" if is_first_half else "S_1X2HND@"
-            exact_key = f"{market_prefix}{handicap_points}_{bet_outcome}"
-            
-            # Look for exact match first
-            for key, odds in odds_data.items():
-                if key.endswith(exact_key):
-                    print(f"Found exact spread market: {key} with odds {odds}")
-                    return key, float(odds)
-            
-            # Try to find nearest points (typically in whole numbers for handicap)
-            # First try higher values (up to +3 from original)
-            for increment in [1, 2, 3]:
-                adj_points = float(handicap_points) + increment
-                adj_key = f"{market_prefix}{adj_points}_{bet_outcome}"
-                
-                for key, odds in odds_data.items():
-                    if key.endswith(adj_key):
-                        print(f"Found higher spread market: {key} with odds {odds}")
-                        return key, float(odds)
-            
-            # Then try lower values (down to -3 from original)
-            for decrement in [1, 2, 3]:
-                adj_points = float(handicap_points) - decrement
-                adj_key = f"{market_prefix}{adj_points}_{bet_outcome}"
-                
-                for key, odds in odds_data.items():
-                    if key.endswith(adj_key):
-                        print(f"Found lower spread market: {key} with odds {odds}")
-                        return key, float(odds)
-            
-            print(f"No matching spread market found for {handicap_points} {outcome}")
-            return None, None
-        
-        else:
-            print(f"Unsupported line type: {line_type}")
-            return None, None
-
-    def __calculate_ev(self, bet_odds, shaped_data):
-        """
-        Calculate the Expected Value (EV) for a bet
-        
-        Parameters:
-        - bet_odds: The decimal odds offered by Bet9ja
-        - shaped_data: The data from Pinnacle with prices
-        
-        Returns:
-        - EV percentage
-        """
-        line_type = shaped_data["category"]["type"].lower()
-        outcome = shaped_data["category"]["meta"]["team"]
-        
-        # Get prices from shaped_data based on line type
-        if line_type == "moneyline":
-            # For moneyline, we use home, away, and draw prices
-            decimal_prices = {}
-            if "priceHome" in shaped_data:
-                decimal_prices["home"] = float(shaped_data["priceHome"])
-            if "priceAway" in shaped_data:
-                decimal_prices["away"] = float(shaped_data["priceAway"])
-            if "priceDraw" in shaped_data:
-                decimal_prices["draw"] = float(shaped_data["priceDraw"])
-                
-        elif line_type == "total":
-            # For totals, we map over/under to home/away
-            decimal_prices = {}
-            if "priceOver" in shaped_data:
-                decimal_prices["home"] = float(shaped_data["priceOver"])  # Over as home
-            if "priceUnder" in shaped_data:
-                decimal_prices["away"] = float(shaped_data["priceUnder"])  # Under as away
-                
-        elif line_type == "spread":
-            # For spread, we use home and away prices
-            decimal_prices = {}
-            if "priceHome" in shaped_data:
-                decimal_prices["home"] = float(shaped_data["priceHome"])
-            if "priceAway" in shaped_data:
-                decimal_prices["away"] = float(shaped_data["priceAway"])
-            if "priceDraw" in shaped_data:
-                decimal_prices["draw"] = float(shaped_data["priceDraw"])
-        
-        # Calculate no-vig prices
-        if not decimal_prices:
-            print("No prices found in shaped data")
-            return -100  # Negative EV as fallback
-            
-        no_vig_prices = calculate_no_vig_prices(decimal_prices)
-        
-        # Map outcome to the corresponding key in no_vig_prices
-        if line_type == "total":
-            # Map over/under to home/away
-            outcome_map = {"over": "home", "under": "away"}
-            outcome_key = outcome_map.get(outcome.lower(), outcome.lower())
-        else:
-            outcome_key = outcome.lower()
-        
-        # Get the true price using the power method (or choose another method if preferred)
-        true_price = no_vig_prices["power"].get(outcome_key)
-        
-        if not true_price:
-            print(f"No no-vig price found for outcome {outcome_key}")
-            return -100  # Negative EV as fallback
-            
-        # Calculate EV
-        ev = calculate_ev(bet_odds, true_price)
-        print(f"Bet odds: {bet_odds}, True price: {true_price}, EV: {ev:.2f}%")
-        
-        return ev
-
-    def __place_bet(self, bet_code, odds, stake=10):
-        """
-        Place a bet on Bet9ja
-        
-        Parameters:
-        - bet_code: The bet code from Bet9ja (e.g., "594248648$S_1X2_1")
-        - odds: The decimal odds for the bet
-        - stake: The amount to stake
+        - bet_data: Dictionary with bet information
         
         Returns:
         - True if bet was placed successfully, False otherwise
         """
-        print(f"Placing bet: {bet_code} with odds {odds} and stake {stake}")
+        # Get max concurrent bets from config
+        max_total_bets = self.__config.get("max_total_concurrent_bets", 5)
+        
+        # Count total current bets across all accounts
+        total_current_bets = sum(account.current_bets for account in self.__accounts)
+        
+        # Check if we've reached the global limit
+        if total_current_bets >= max_total_bets:
+            print(f"Reached global limit of {max_total_bets} concurrent bets. Queuing bet.")
+            # Re-add to queue with a delay
+            threading.Timer(30.0, lambda: self.__bet_queue.put(bet_data)).start()
+            return False
+        
+        # Find an available account
+        for account in self.__accounts:
+            if account.can_place_bet():
+                # Check if login is needed
+                if account.needs_login():
+                    try:
+                        self.__do_login_for_account(account)
+                    except Exception as e:
+                        print(f"Failed to login to account {account.username}: {e}")
+                        continue  # Try next account
+                
+                # Try to place bet with this account
+                account.increment_bets()
+                success = self.__place_bet_for_account(
+                    account=account,
+                    bet_code=bet_data["bet_code"],
+                    odds=bet_data["odds"],
+                    modified_shaped_data=bet_data["modified_shaped_data"],
+                    bankroll=account.balance
+                )
+                
+                if success:
+                    account.decrement_bets()
+                    print(f"Bet placed successfully with account {account.username}")
+                    return True
+        
+        print("No available accounts to place bet. Queuing for retry.")
+        # Re-add to queue with a delay
+        threading.Timer(60.0, lambda: self.__bet_queue.put(bet_data)).start()
+        return False
+
+    def __place_bet_for_account(self, account, bet_code, odds, modified_shaped_data, bankroll):
+        """
+        Place a bet on Bet9ja using a specific account
+        
+        Parameters:
+        - account: BetAccount instance
+        - bet_code: The bet code from Bet9ja (e.g., "594248648$S_1X2_1")
+        - odds: The decimal odds for the bet
+        - modified_shaped_data: The modified shaped data for the bet
+        - bankroll: The bankroll for the account
+        
+        Returns:
+        - True if bet was placed successfully, False otherwise
+        """
+        print(f"Placing bet with account {account.username}: {bet_code} with odds {odds}")
+
+        # calculate stake
+        stake = self.__calculate_stake(odds, modified_shaped_data, bankroll)
+
         
         # Construct the betslip data
         betslip_data = {
@@ -450,29 +450,609 @@ class BetEngine(WebsiteOpener):
             response = requests.post(
                 f"{self.__bet_api_host}/sportsbook/placebet/PlacebetV2?source=desktop&v_cache_version=1.274.3.186",
                 data=form_data,
-                cookies=self.__cookie_jar,
+                cookies=account.cookie_jar,
                 headers=headers
             )
             
             if response.status_code == 401:
-                print("Session expired, logging in again...")
-                self.__do_login()
-                return self.__place_bet(bet_code, odds, stake)
+                print(f"Session expired for account {account.username}, logging in again...")
+                self.__do_login_for_account(account)
+                return self.__place_bet_for_account(account, bet_code, odds, stake)
             
             response_data = response.json()
-            print(f"Bet placement response: {response_data}")
+            if response_data.get("status") == -1 or response_data["error"].get("message") == "Invalid session" or response_data["error"].get("code") == 114:
+                print(f"Session expired for account {account.username}, logging in again...")
+                self.__do_login_for_account(account)
+                return self.__place_bet_for_account(account, bet_code, odds, stake)
+            
+            print(f"Bet placement response for account {account.username}: {response_data}")
             
             # Check if the bet was placed successfully
-            if response_data.get("R") == "OK":
-                print("Bet placed successfully!")
+            if response_data.get("status") == 1:
+                print(f"Bet placed successfully with account {account.username}!")
                 return True
             else:
-                print(f"Failed to place bet: {response_data}")
+                print(f"Failed to place bet with account {account.username}: {response_data}")
                 return False
                 
         except Exception as e:
-            print(f"Error placing bet: {e}")
+            print(f"Error placing bet with account {account.username}: {e}")
             return False
+
+    def __place_bet(self, bet_code, odds, modified_shaped_data):
+        """
+        Queue a bet for placement
+        
+        Parameters:
+        - bet_code: The bet code from Bet9ja (e.g., "594248648$S_1X2_1")
+        - odds: The decimal odds for the bet
+        - stake: The amount to stake
+        
+        Returns:
+        - True if bet was queued successfully
+        """
+        print(f"Queueing bet: {bet_code} with odds {odds}")
+        
+        # Add bet to queue
+        bet_data = {
+            "bet_code": bet_code,
+            "odds": odds,
+            "modified_shaped_data": modified_shaped_data,
+            "timestamp": time.time()
+        }
+        
+        self.__bet_queue.put(bet_data)
+        return True  # Return True as the bet was queued successfully
+
+    def __find_market_bet_code_with_points(self, event_details, line_type, points, outcome, is_first_half=False):
+        """
+        Find the appropriate bet code in the Bet9ja event details and return the adjusted points value
+        
+        Parameters:
+        - event_details: The event details from Bet9ja
+        - line_type: The type of bet (spread, moneyline, total)
+        - points: The points value for the bet
+        - outcome: The outcome (home, away, draw, over, under)
+        - is_first_half: Whether the bet is for the first half
+        
+        Returns:
+        - Tuple of (bet_code, odds, adjusted_points)
+        """
+        print(f"Finding market for: {line_type} - {outcome} - {points} - First Half: {is_first_half}")
+        
+        if "O" not in event_details:
+            print("No market odds found in event details")
+            return None, None, None
+        
+        odds_data = event_details["O"]
+        
+        # Handle MONEYLINE bets (1X2 in Bet9ja)
+        if line_type.lower() == "moneyline":
+            # Moneyline doesn't have points, so we'll use None
+            adjusted_points = None
+            
+            # Map outcome to Bet9ja format
+            outcome_map = {"home": "1", "away": "2", "draw": "X"}
+            if outcome.lower() not in outcome_map:
+                print(f"Invalid outcome for moneyline: {outcome}")
+                return None, None, adjusted_points
+                
+            bet_outcome = outcome_map[outcome.lower()]
+            
+            # Format: S_1X21T_1 for first half
+            market_prefix = "S_1X21T_" if is_first_half else "S_1X2_"
+            market_key = f"{market_prefix}{bet_outcome}"
+            
+            # Look for exact match instead of endswith
+            for key, odds in odds_data.items():
+                # Check if the key exactly matches our market key
+                if key == market_key:
+                    print(f"Found moneyline market: {key} with odds {odds}")
+                    return key, float(odds), adjusted_points
+            
+            print(f"No matching moneyline market found for {outcome}")
+            return None, None, adjusted_points
+            
+        # Handle TOTAL bets (Over/Under in Bet9ja)
+        elif line_type.lower() == "total":
+            # Map outcome to Bet9ja format
+            outcome_map = {"over": "O", "under": "U"}
+            if outcome.lower() not in outcome_map:
+                print(f"Invalid outcome for total: {outcome}")
+                return None, None, None
+                
+            bet_outcome = outcome_map[outcome.lower()]
+            
+            # First try exact match with original points
+            market_prefix = "S_OU1T@" if is_first_half else "S_OU@"
+            exact_key = f"{market_prefix}{points}_{bet_outcome}"
+            
+            for key, odds in odds_data.items():
+                if key == exact_key:  # Exact match instead of endswith
+                    print(f"Found exact total market: {key} with odds {odds}")
+                    # Use original points since it's an exact match
+                    return key, float(odds), points
+            
+            # Round the original points to nearest .0 or .5
+            original_float = float(points)
+            
+            # Try to find nearest standard points (.0 or .5)
+            # Generate a list of standard points to check (nearest .0 and .5 values)
+            standard_points = []
+            
+            # Get the nearest .0 and .5 values above and below
+            floor_int = math.floor(original_float)
+            ceil_int = math.ceil(original_float)
+            
+            # Add the standard points in order of proximity
+            standard_points.append(floor_int)  # .0 below
+            standard_points.append(floor_int + 0.5)  # .5 above floor
+            if ceil_int != floor_int:
+                standard_points.append(ceil_int)  # .0 above
+                standard_points.append(ceil_int - 0.5)  # .5 below ceil
+            
+            # Sort by distance from original points
+            standard_points.sort(key=lambda x: abs(x - original_float))
+            
+            # Try each standard point
+            for std_point in standard_points:
+                # Skip negative or zero points for totals
+                if std_point <= 0:
+                    continue
+                    
+                std_key = f"{market_prefix}{std_point}_{bet_outcome}"
+                
+                for key, odds in odds_data.items():
+                    if key == std_key:  # Exact match
+                        print(f"Found standard total market: {key} with odds {odds}")
+                        return key, float(odds), std_point
+            
+            # If standard points don't match, try incrementing by 0.5 up to +/-2
+            for increment in [0.5, 1.0, 1.5, 2.0]:
+                for direction in [1, -1]:  # Try both up and down
+                    adj_points = original_float + (direction * increment)
+                    if adj_points <= 0:
+                        continue  # Skip negative or zero points
+                        
+                    # Round to nearest .0 or .5
+                    adj_points_rounded = round(adj_points * 2) / 2
+                    
+                    adj_key = f"{market_prefix}{adj_points_rounded}_{bet_outcome}"
+                    
+                    for key, odds in odds_data.items():
+                        if key == adj_key:  # Exact match
+                            print(f"Found adjusted total market: {key} with odds {odds}")
+                            return key, float(odds), adj_points_rounded
+            
+            print(f"No matching total market found for {points} {outcome}")
+            return None, None, None
+            
+        # Handle SPREAD bets (Handicap in Bet9ja)
+        elif line_type.lower() == "spread":
+            # Check if points is near zero - if so, use Draw No Bet market instead
+            if abs(float(points)) < 0.01:
+                print("Handicap is 0, using Draw No Bet (DNB) market")
+                # Map outcome to Bet9ja format for DNB
+                outcome_map = {"home": "1", "away": "2"}
+                if outcome.lower() not in outcome_map:
+                    print(f"Invalid outcome for DNB: {outcome}")
+                    return None, None, None
+                    
+                bet_outcome = outcome_map[outcome.lower()]
+                
+                # Format: S_DNB1T_1 for first half, S_DNB_1 for full match
+                market_prefix = "S_DNB1T_" if is_first_half else "S_DNB_"
+                dnb_key = f"{market_prefix}{bet_outcome}"
+                
+                # Look for exact match
+                for key, odds in odds_data.items():
+                    if key == dnb_key:
+                        print(f"Found Draw No Bet market: {key} with odds {odds}")
+                        return key, float(odds), 0  # Return 0 as the points value
+                        
+                print(f"No matching Draw No Bet market found for {outcome}")
+                return None, None, None
+                
+            # Adjust the points for away team (Bet9ja uses S_AH@X_Y format)
+            handicap_points = points
+            if outcome.lower() == "away":
+                # Bet9ja represents away handicaps with negative of the original value
+                handicap_points = -float(points)
+            
+            # Map outcome to Bet9ja format for Asian Handicap
+            outcome_map = {"home": "1", "away": "2"}
+            if outcome.lower() not in outcome_map:
+                print(f"Invalid outcome for handicap: {outcome}")
+                return None, None, None
+                
+            bet_outcome = outcome_map[outcome.lower()]
+            
+            # Format: S_AH1T@X_Y for first half, S_AH@X_Y for full match
+            market_prefix = "S_AH1T@" if is_first_half else "S_AH@"
+            exact_key = f"{market_prefix}{handicap_points}_{bet_outcome}"
+            
+            # Look for exact match first
+            for key, odds in odds_data.items():
+                if key == exact_key:  # Exact match instead of endswith
+                    print(f"Found exact handicap market: {key} with odds {odds}")
+                    # Use original points since it's an exact match
+                    return key, float(odds), points
+            
+            # Round the handicap points to nearest .0 or .5
+            handicap_float = float(handicap_points)
+            
+            # Generate a list of standard handicaps to check (nearest .0 and .5 values)
+            standard_handicaps = []
+            
+            # Get the nearest .0 and .5 values above and below
+            floor_int = math.floor(handicap_float)
+            ceil_int = math.ceil(handicap_float)
+            
+            # Add the standard handicaps in order of proximity
+            standard_handicaps.append(floor_int)  # .0 below
+            standard_handicaps.append(floor_int + 0.5)  # .5 above floor
+            if ceil_int != floor_int:
+                standard_handicaps.append(ceil_int)  # .0 above
+                standard_handicaps.append(ceil_int - 0.5)  # .5 below ceil
+            
+            # Sort by distance from original handicap
+            standard_handicaps.sort(key=lambda x: abs(x - handicap_float))
+            
+            # Try each standard handicap
+            for std_handicap in standard_handicaps:
+                std_key = f"{market_prefix}{std_handicap}_{bet_outcome}"
+                
+                for key, odds in odds_data.items():
+                    if key == std_key:  # Exact match
+                        print(f"Found standard handicap market: {key} with odds {odds}")
+                        # Convert back to original format if needed
+                        result_points = std_handicap
+                        return key, float(odds), result_points
+            
+            # If standard handicaps don't match, try incrementing by 0.5 up to +/-3
+            for increment in [0.5, 1.0, 1.5, 2.0, 2.5, 3.0]:
+                for direction in [1, -1]:  # Try both up and down
+                    adj_handicap = handicap_float + (direction * increment)
+                    
+                    # Round to nearest .0 or .5
+                    adj_handicap_rounded = round(adj_handicap * 2) / 2
+                    
+                    adj_key = f"{market_prefix}{adj_handicap_rounded}_{bet_outcome}"
+                    
+                    for key, odds in odds_data.items():
+                        if key == adj_key:  # Exact match
+                            print(f"Found adjusted handicap market: {key} with odds {odds}")
+                            # Convert back to original format if needed
+                            result_points = adj_handicap_rounded
+                            return key, float(odds), result_points
+            
+            print(f"No matching handicap market found for {handicap_points} {outcome}")
+            return None, None, None
+        
+        else:
+            print(f"Unsupported line type: {line_type}")
+            return None, None, None
+            
+    def __extract_points_from_key(self, key):
+        """Extract points value from a bet key"""
+        try:
+            # For totals: S_OU@2.5_O or S_OU1T@2.5_O
+            # For spreads: S_1X2HND@2_1H or S_1X2HND1T@2_1H
+            parts = key.split('@')
+            if len(parts) < 2:
+                return None
+                
+            # The points should be between '@' and '_'
+            points_part = parts[1].split('_')[0]
+            return float(points_part)
+        except (ValueError, IndexError):
+            return None
+
+    def __calculate_ev(self, bet_odds, shaped_data):
+        """
+        Calculate the Expected Value (EV) for a bet
+        
+        Parameters:
+        - bet_odds: The decimal odds offered by Bet9ja
+        - shaped_data: The data from Pinnacle with prices
+        
+        Returns:
+        - EV percentage
+        """
+        line_type = shaped_data["category"]["type"].lower()
+        outcome = shaped_data["category"]["meta"]["team"]
+        points = shaped_data["category"]["meta"].get("value")
+        
+        # Determine if this is for first half or full match
+        is_first_half = False
+        period_key = "num_0"  # Default to full match
+        if "periodNumber" in shaped_data and shaped_data["periodNumber"] == "1":
+            is_first_half = True
+            period_key = "num_1"
+            
+        # Get the event ID to fetch latest odds from Pinnacle
+        event_id = shaped_data.get("eventId")
+        
+        # Fetch latest odds from Pinnacle API if event ID is available
+        latest_prices = self.__fetch_latest_pinnacle_odds(event_id, line_type, points, outcome, period_key)
+        
+        # If we couldn't get latest odds, fall back to the ones in shaped_data
+        if not latest_prices:
+            print("Using odds from original alert as fallback")
+            # Get prices from shaped_data based on line type
+            if line_type == "moneyline":
+                # For moneyline, we use home, away, and draw prices
+                decimal_prices = {}
+                if "priceHome" in shaped_data:
+                    decimal_prices["home"] = float(shaped_data["priceHome"])
+                if "priceAway" in shaped_data:
+                    decimal_prices["away"] = float(shaped_data["priceAway"])
+                if "priceDraw" in shaped_data:
+                    decimal_prices["draw"] = float(shaped_data["priceDraw"])
+                    
+            elif line_type == "total":
+                # For totals, we map over/under to home/away
+                decimal_prices = {}
+                if "priceOver" in shaped_data:
+                    decimal_prices["home"] = float(shaped_data["priceOver"])  # Over as home
+                if "priceUnder" in shaped_data:
+                    decimal_prices["away"] = float(shaped_data["priceUnder"])  # Under as away
+                    
+            elif line_type == "spread":
+                # For spread, we use home and away prices
+                decimal_prices = {}
+                if "priceHome" in shaped_data:
+                    decimal_prices["home"] = float(shaped_data["priceHome"])
+                if "priceAway" in shaped_data:
+                    decimal_prices["away"] = float(shaped_data["priceAway"])
+        else:
+            # Use the latest prices we fetched
+            decimal_prices = latest_prices
+            print(f"Using latest Pinnacle odds: {decimal_prices}")
+        
+        # Store the prices for later use in stake calculation
+        shaped_data["_decimal_prices"] = decimal_prices
+        
+        # Calculate no-vig prices
+        if not decimal_prices:
+            print("No prices found for calculation")
+            return -100  # Negative EV as fallback
+            
+        no_vig_prices = calculate_no_vig_prices(decimal_prices)
+        
+        # Map outcome to the corresponding key in no_vig_prices
+        if line_type == "total":
+            # Map over/under to home/away
+            outcome_map = {"over": "home", "under": "away"}
+            outcome_key = outcome_map.get(outcome.lower(), outcome.lower())
+        else:
+            outcome_key = outcome.lower()
+        
+        # Store the outcome key for later use in stake calculation
+        shaped_data["_outcome_key"] = outcome_key
+        
+        # Get the true price using the power method (or choose another method if preferred)
+        true_price = no_vig_prices["power"].get(outcome_key)
+        
+        if not true_price:
+            print(f"No no-vig price found for outcome {outcome_key}")
+            return -100  # Negative EV as fallback
+            
+        # Calculate EV
+        ev = calculate_ev(bet_odds, true_price)
+        print(f"Bet odds: {bet_odds}, True price: {true_price}, EV: {ev:.2f}%")
+        
+        return ev
+        
+    def __fetch_latest_pinnacle_odds(self, event_id, line_type, points, outcome, period_key):
+        """
+        Fetch the latest odds from Pinnacle API for a specific event
+        
+        Parameters:
+        - event_id: The Pinnacle event ID
+        - line_type: The type of bet (spread, moneyline, total)
+        - points: The points value for the bet
+        - outcome: The outcome (home, away, draw, over, under)
+        - period_key: The period key (num_0 for full match, num_1 for first half)
+        
+        Returns:
+        - Dictionary with the latest decimal prices or None if not found
+        """
+        if not event_id:
+            print("No event ID provided, cannot fetch latest odds")
+            return None
+            
+        pinnacle_api_host = os.getenv("PINNACLE_ODDS_HOST")
+        if not pinnacle_api_host:
+            print("Pinnacle Events API host not configured")
+            return None
+            
+        try:
+            url = f"{pinnacle_api_host}/events/{event_id}"
+            print(f"Fetching latest odds from: {url}")
+            
+            response = requests.get(url)
+            if response.status_code != 200:
+                print(f"Failed to fetch latest odds: HTTP {response.status_code}")
+                return None
+                
+            event_data = response.json()
+            if not event_data or "data" not in event_data or not event_data["data"]:
+                print("No data returned from Pinnacle API")
+                return None
+                
+            if event_data["data"] == None or event_data["data"] == "null":
+                return None
+            
+            # Extract the period data
+            periods = event_data["data"].get("periods", {})
+            period = periods.get(period_key, {})
+            
+            # Extract the appropriate odds based on line type
+            decimal_prices = {}
+            
+            if line_type == "moneyline":
+                money_line = period.get("money_line", {})
+                if "home" in money_line:
+                    decimal_prices["home"] = float(money_line["home"])
+                if "away" in money_line:
+                    decimal_prices["away"] = float(money_line["away"])
+                if "draw" in money_line:
+                    decimal_prices["draw"] = float(money_line["draw"])
+                    
+            elif line_type == "spread":
+                spreads = period.get("spreads", {})
+                # Find the closest spread to the points value
+                closest_spread = None
+                min_diff = float('inf')
+                
+                for spread_key, spread_data in spreads.items():
+                    try:
+                        spread_points = float(spread_data.get("hdp", 0))
+                        diff = abs(float(points) - spread_points)
+                        
+                        if diff < min_diff:
+                            min_diff = diff
+                            closest_spread = spread_data
+                    except (ValueError, TypeError):
+                        continue
+                
+                if closest_spread:
+                    if "home" in closest_spread:
+                        decimal_prices["home"] = float(closest_spread["home"])
+                    if "away" in closest_spread:
+                        decimal_prices["away"] = float(closest_spread["away"])
+                    
+            elif line_type == "total":
+                totals = period.get("totals", {})
+                # Find the closest total to the points value
+                closest_total = None
+                min_diff = float('inf')
+                
+                for total_key, total_data in totals.items():
+                    try:
+                        total_points = float(total_data.get("points", 0))
+                        diff = abs(float(points) - total_points)
+                        
+                        if diff < min_diff:
+                            min_diff = diff
+                            closest_total = total_data
+                    except (ValueError, TypeError):
+                        continue
+                
+                if closest_total:
+                    if "over" in closest_total:
+                        decimal_prices["home"] = float(closest_total["over"])  # Over as home
+                    if "under" in closest_total:
+                        decimal_prices["away"] = float(closest_total["under"])  # Under as away
+            
+            return decimal_prices if decimal_prices else None
+            
+        except Exception as e:
+            print(f"Error fetching latest odds: {e}")
+            return None
+
+    def __power_method_devig(self, odds_list, max_iter=100, tol=1e-10):
+        """
+        Devigs a list of decimal odds using the power method.
+        Returns the fair probabilities (without the bookmaker's margin).
+        
+        Parameters:
+        - odds_list: List of decimal odds values
+        - max_iter: Maximum number of iterations for optimization
+        - tol: Tolerance for convergence
+        
+        Returns:
+        - List of fair probabilities
+        """
+        def implied_probs(power):
+            return [o**-power for o in odds_list]
+
+        def objective(power):
+            return abs(sum(implied_probs(power)) - 1)
+
+        res = minimize_scalar(objective, bounds=(0.001, 10), method='bounded')
+        power = res.x
+        probs = implied_probs(power)
+        total = sum(probs)
+        return [p / total for p in probs]  # normalized
+        
+    def __kelly_stake(self, prob, odds, bankroll):
+        """
+        Calculate the optimal stake using the Kelly Criterion
+        
+        Parameters:
+        - prob: Probability of winning
+        - odds: Decimal odds
+        - bankroll: Available bankroll
+        
+        Returns:
+        - Recommended stake amount (0 if no bet recommended)
+        """
+        b = odds - 1
+        q = 1 - prob
+        numerator = (b * prob - q)
+        if numerator <= 0:
+            return 0  # no bet
+        return bankroll * numerator / b
+        
+    def __calculate_stake(self, bet_odds, shaped_data, bankroll):
+        """
+        Calculate the stake amount based on Kelly criterion
+        
+        Parameters:
+        - bet_odds: The decimal odds offered by Bet9ja
+        - shaped_data: The data with prices and outcome information
+        
+        Returns:
+        - Recommended stake amount
+        """
+        # Get the stored decimal prices and outcome key
+        decimal_prices = shaped_data.get("_decimal_prices", {})
+        outcome_key = shaped_data.get("_outcome_key", "")
+        
+        if not decimal_prices or not outcome_key:
+            print("Missing required data for stake calculation")
+            return 10  # Default stake if calculation not possible
+        
+        # Extract values into a list for power method
+        odds_values = list(decimal_prices.values())
+        if not odds_values:
+            return 10  # Default stake
+        
+        # Calculate fair probabilities using power method
+        fair_probs = self.__power_method_devig(odds_values)
+        
+        # Map the probabilities back to their outcomes
+        outcome_probs = {}
+        for i, (outcome, _) in enumerate(decimal_prices.items()):
+            if i < len(fair_probs):
+                outcome_probs[outcome] = fair_probs[i]
+        
+        # Get the probability for our specific outcome
+        if outcome_key not in outcome_probs:
+            print(f"Outcome {outcome_key} not found in probabilities")
+            return 10  # Default stake
+            
+        outcome_prob = outcome_probs[outcome_key]
+        
+        
+        # Calculate Kelly stake
+        full_kelly = self.__kelly_stake(outcome_prob, bet_odds, bankroll)
+        
+        # Use 30% of Kelly as a more conservative approach
+        fractional_kelly = full_kelly * 0.3
+        
+        # Apply min/max stake limits
+        min_stake = float(os.getenv("MIN_STAKE", "10"))
+        max_stake = float(os.getenv("MAX_STAKE", "100"))
+        
+        stake = max(min_stake, min(fractional_kelly, max_stake))
+        
+        print(f"Probability: {outcome_prob:.4f}, Full Kelly: {full_kelly:.2f}, "
+              f"Fractional Kelly (30%): {fractional_kelly:.2f}, Final Stake: {stake:.2f}")
+        
+        return stake
 
     def notify(self, shaped_data):
         """
@@ -494,7 +1074,7 @@ class BetEngine(WebsiteOpener):
         away_team = shaped_data["game"]["away"]
         line_type = shaped_data["category"]["type"]
         outcome = shaped_data["category"]["meta"]["team"]
-        points = shaped_data["category"]["meta"].get("value")
+        original_points = shaped_data["category"]["meta"].get("value")
         
         # Determine if this is for first half or full match
         is_first_half = False
@@ -514,10 +1094,10 @@ class BetEngine(WebsiteOpener):
             return
             
         # Step 3: Find the market for the bet
-        bet_code, bet_odds = self.__find_market_bet_code(
+        bet_code, bet_odds, adjusted_points = self.__find_market_bet_code_with_points(
             event_details, 
             line_type, 
-            points, 
+            original_points, 
             outcome, 
             is_first_half
         )
@@ -526,22 +1106,52 @@ class BetEngine(WebsiteOpener):
             print("Could not find appropriate market, cannot place bet")
             return
             
-        # Step 4: Calculate EV
-        ev = self.__calculate_ev(bet_odds, shaped_data)
+        # Create a modified shaped_data with the adjusted points
+        modified_shaped_data = shaped_data.copy()
+        modified_shaped_data["category"]["meta"]["value"] = adjusted_points
+        print(f"Using adjusted points: {adjusted_points} (original was: {original_points})")
+        
+        # Step 4: Calculate EV with the adjusted points
+        ev = self.__calculate_ev(bet_odds, modified_shaped_data)
         
         # Step 5: Place bet if EV is positive and above threshold
         if ev > self.__min_ev:
             print(f"Positive EV ({ev:.2f}%), placing bet")
-            success = self.__place_bet(f"{event_id}${bet_code}", bet_odds)
+            
+            # Calculate optimal stake using Kelly criterion            
+            success = self.__place_bet(f"{event_id}${bet_code}", bet_odds, modified_shaped_data)
             
             if success:
-                print(f"Successfully placed bet on {home_team} vs {away_team} - {line_type} {outcome} {points}")
+                print(f"Successfully queued bet on {home_team} vs {away_team} - {line_type} {outcome} {adjusted_points} with stake {stake:.2f}")
             else:
-                print("Failed to place bet")
+                print("Failed to queue bet")
         else:
             print(f"Negative or insufficient EV ({ev:.2f}%), not placing bet")
             
         return ev > self.__min_ev
+
+    def __find_market_bet_code(self, event_details, line_type, points, outcome, is_first_half=False):
+        """
+        DEPRECATED: Use __find_market_bet_code_with_points instead
+        This method is kept for backward compatibility.
+        
+        Find the appropriate bet code in the Bet9ja event details
+        
+        Parameters:
+        - event_details: The event details from Bet9ja
+        - line_type: The type of bet (spread, moneyline, total)
+        - points: The points value for the bet
+        - outcome: The outcome (home, away, draw, over, under)
+        - is_first_half: Whether the bet is for the first half
+        
+        Returns:
+        - Tuple of (bet_code, odds)
+        """
+        # Forward to the new method and discard the adjusted points
+        bet_code, odds, _ = self.__find_market_bet_code_with_points(
+            event_details, line_type, points, outcome, is_first_half
+        )
+        return bet_code, odds
 
 if __name__ == "__main__":
     """Main Application"""

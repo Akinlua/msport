@@ -4,57 +4,55 @@ import signal
 import sys
 import time
 import dotenv
+import traceback
 from bet_engine import BetEngine
 from odds_engine import OddsEngine
 
 # Load environment variables
 dotenv.load_dotenv()
 
-def handle_interrupt(signum, frame):
-    """Handle keyboard interrupts gracefully"""
-    print("\nShutting down application...")
-    sys.exit(0)
-
 def main():
     """
-    Main application entry point
-    
-    Initializes the bet engine and odds engine,
-    then starts monitoring for odds alerts
+    Main entry point for the BetAlert application.
+    Initializes the odds engine and bet engine, then starts monitoring for odds alerts.
     """
     print("Starting BetAlert application...")
     
     try:
-        # Initialize bet engine
+        # Initialize the bet engine (handles placing bets on Bet9ja)
         print("Initializing bet engine...")
         bet_engine = BetEngine(
             headless=os.getenv("ENVIRONMENT") == "production",
-            bet_host=os.getenv("BETNAIJA_HOST"),
-            bet_api_host=os.getenv("BETNAIJA_API_HOST"),
-            min_ev=float(os.getenv("MIN_EV", "0"))
+            config_file="config.json"
         )
         
-        # Initialize odds engine with the bet engine
+        # Initialize the odds engine (handles monitoring Pinnacle for odds alerts)
         print("Initializing odds engine...")
         odds_engine = OddsEngine(
             bet_engine=bet_engine,
-            host=os.getenv("PINNACLE_ODDS_HOST"),
-            user_id=os.getenv("PINNACLE_USER_ID")
+            pinnacle_host=os.getenv("PINNACLE_HOST"),
+            pinnacle_api_host=os.getenv("PINNACLE_API_HOST")
         )
         
-        # Register interrupt handler for clean shutdown
-        signal.signal(signal.SIGINT, handle_interrupt)
+        # Set up signal handler for graceful shutdown
+        def signal_handler(sig, frame):
+            print("\nShutting down BetAlert application...")
+            odds_engine.stop()
+            sys.exit(0)
+            
+        signal.signal(signal.SIGINT, signal_handler)
         
         # Start monitoring for odds alerts
-        odds_check_interval = int(os.getenv("ODDS_CHECK_INTERVAL", "60"))
-        print(f"Starting odds monitoring with {odds_check_interval} second intervals...")
-        odds_engine.start_monitoring(interval=odds_check_interval)
+        print("Starting to monitor for odds alerts...")
+        odds_engine.start_monitoring()
         
-    except ValueError as e:
-        print(f"Configuration error: {e}")
-        sys.exit(1)
+        # Keep the main thread running
+        while True:
+            time.sleep(1)
+            
     except Exception as e:
-        print(f"Unexpected error: {e}")
+        print(f"Error in main application: {e}")
+        traceback.print_exc()
         sys.exit(1)
 
 if __name__ == "__main__":

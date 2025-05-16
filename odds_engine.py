@@ -3,6 +3,7 @@ import os
 import time
 import requests
 import json
+import threading
 dotenv.load_dotenv()
 
 class BetEngine:
@@ -18,33 +19,65 @@ class OddsEngine:
     there are potential value betting opportunities.
     """
     
-    def __init__(self, bet_engine=None, host=os.getenv("PINNACLE_ODDS_HOST"), 
-                 user_id=os.getenv("PINNACLE_USER_ID")):
+    def __init__(self, bet_engine=None, pinnacle_host=None, pinnacle_api_host=None):
         self.bet_engine = bet_engine if bet_engine else BetEngine()
-        self.__host = host
-        self.__user_id = user_id
+        self.__host = pinnacle_host or os.getenv("PINNACLE_HOST")
+        self.__api_host = pinnacle_api_host or os.getenv("PINNACLE_API_HOST")
+        self.__user_id = os.getenv("PINNACLE_USER_ID")
         self.__last_processed_timestamp = int(time.time()) * 1000  # Convert to milliseconds
         self.__processed_alerts = set()  # Keep track of processed alert IDs
+        self.__processed_event_line_types = set()  # Track event ID + line type combinations
+        self.__running = False
+        self.__monitor_thread = None
         
         # Validate required environment variables
-        if not host or not user_id:
-            raise ValueError("Pinnacle odds host or user ID not found in environment variables")
+        if not self.__host or not self.__api_host or not self.__user_id:
+            raise ValueError("Pinnacle host, API host, or user ID not found in environment variables")
     
     def start_monitoring(self, interval=60):
         """
-        Start monitoring for new odds alerts continuously
+        Start monitoring for new odds alerts in a separate thread
+        
+        Parameters:
+        - interval: Time in seconds between checks for new alerts
+        """
+        if self.__running:
+            print("Monitoring already running")
+            return
+            
+        self.__running = True
+        self.__monitor_thread = threading.Thread(
+            target=self.__monitoring_loop,
+            args=(interval,),
+            daemon=True
+        )
+        self.__monitor_thread.start()
+        print(f"Started odds monitoring thread with interval of {interval} seconds")
+        
+    def stop(self):
+        """Stop the monitoring thread"""
+        if not self.__running:
+            print("Monitoring not running")
+            return
+            
+        print("Stopping odds monitoring...")
+        self.__running = False
+        if self.__monitor_thread and self.__monitor_thread.is_alive():
+            self.__monitor_thread.join(timeout=5)
+        print("Odds monitoring stopped")
+        
+    def __monitoring_loop(self, interval):
+        """
+        Continuous monitoring loop that runs in a separate thread
         
         Parameters:
         - interval: Time in seconds between checks for new alerts
         """
         print(f"Starting odds monitoring with interval of {interval} seconds")
-        while True:
+        while self.__running:
             try:
                 self.get_odds()
                 time.sleep(interval)
-            except KeyboardInterrupt:
-                print("Odds monitoring stopped by user")
-                break
             except Exception as e:
                 print(f"Error in odds monitoring: {e}")
                 time.sleep(interval)  # Still wait before retrying
@@ -57,10 +90,9 @@ class OddsEngine:
         # Look back 10 minutes for alerts
         lookback_time = current_time - (60 * 10 * 1000)
         
-        # TODO: Add support for dropNotificationsCursor and openingLineNotificationsCursor
         try:
             response = requests.get(
-                f"{self.__host}/alerts/{self.__user_id}?dropNotificationsCursor={lookback_time}-0"
+                f"{self.__host}/alerts/{self.__user_id}?dropNotificationsCursor={lookback_time}-0&limitChangeNotificationsCursor={os.getenv('LIMITCHANGENOTIFICATIONCURSOR', lookback_time)}-0&openingLineNotificationsCursor={os.getenv('OPENLINENOTIFICATIONCURSOR', lookback_time)}-1"
             )
             
             if response.status_code != 200:
@@ -91,7 +123,14 @@ class OddsEngine:
         """
         # Skip if we've already processed this alert
         alert_id = alert.get("eventId", "")
-        if alert_id in self.__processed_alerts:
+        line_type = alert.get("lineType", "")
+        
+        # Create a unique key for this event + line type combination
+        event_line_key = f"{alert_id}_{line_type}"
+        
+        # Skip if we've already processed this event + line type combination
+        if event_line_key in self.__processed_event_line_types:
+            print(f"Skipping already processed event + line type: {event_line_key}")
             return
             
         # Skip alerts for matches that have already started
@@ -111,11 +150,16 @@ class OddsEngine:
             
         # Update tracking
         self.__processed_alerts.add(alert_id)
+        self.__processed_event_line_types.add(event_line_key)
         self.__last_processed_timestamp = max(self.__last_processed_timestamp, int(alert.get("timestamp", 0)))
         
         # Limit the size of processed alerts set to prevent memory growth
         if len(self.__processed_alerts) > 1000:
             self.__processed_alerts = set(list(self.__processed_alerts)[-1000:])
+            
+        # Also limit the event + line type combinations set
+        if len(self.__processed_event_line_types) > 2000:
+            self.__processed_event_line_types = set(list(self.__processed_event_line_types)[-2000:])
     
     def __shape_alert_data(self, alert):
         """
@@ -148,6 +192,7 @@ class OddsEngine:
             },
             "match_type": alert.get("type", ""),
             "periodNumber": alert.get("periodNumber", "0"),  # Default to main match
+            "eventId": alert.get("eventId")  # Include the event ID for fetching latest odds
         }
         
         # Add the appropriate prices based on line type
@@ -191,18 +236,15 @@ class OddsEngine:
     
     def __notify_bet_engine(self, shaped_data):
         """
-        Send the shaped data to the bet engine
+        Send the shaped alert data to the bet engine
         
         Parameters:
         - shaped_data: The shaped alert data
         """
         try:
-            # Send a copy to avoid reference issues
-            result = self.bet_engine.notify(shaped_data.copy())
-            return result
+            self.bet_engine.notify(shaped_data)
         except Exception as e:
             print(f"Error notifying bet engine: {e}")
-            return False
 
 if __name__ == "__main__":
     """Test the OddsEngine independently"""

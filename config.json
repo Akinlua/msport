@@ -1,0 +1,19 @@
+{
+    "accounts": [
+        {
+            "username": "Suleybawa",
+            "password": "Spotify1",
+            "active": true,
+            "max_concurrent_bets": 3,
+            "min_balance": 100
+        }
+    ],
+    "max_total_concurrent_bets": 5,
+    "bet_settings": {
+        "min_ev": 5.5,
+        "kelly_fraction": 0.3,
+        "min_stake": 10,
+        "max_stake": 100,
+        "bankroll": 1000
+    }
+} 
