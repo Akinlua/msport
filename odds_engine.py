@@ -87,8 +87,8 @@ class OddsEngine:
         """
         current_time = int(time.time() * 1000)
         # Look back 10 minutes for alerts
-        # lookback_time = current_time - (60 * 10 * 1000)
-        lookback_time = 1747423479000
+        lookback_time = current_time - (60 * 10 * 1000)
+        # lookback_time = 1747423479000
 
         print(f"Looking back {lookback_time} milliseconds")
         
