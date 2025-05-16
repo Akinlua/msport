@@ -67,7 +67,9 @@ class BetEngine(WebsiteOpener):
                  bet_api_host=os.getenv("BETNAIJA_API_HOST"),
                  min_ev=float(os.getenv("MIN_EV", "0")),
                  config_file="config.json"):
+        print(f"Initializing BetEngine with min_ev: {min_ev}")
         super().__init__(headless)
+        print(f"BetEngine initialized with headless: {headless}")
         self.__bet_api_host = bet_api_host
         self.__bet_host = bet_host
         self.__min_ev = min_ev
@@ -76,6 +78,7 @@ class BetEngine(WebsiteOpener):
         self.__load_config(config_file)
         self.__setup_accounts()
         self.__start_bet_worker()
+        self.__browser_open = True
         
     def __load_config(self, config_file):
         """Load configuration from JSON file"""
@@ -132,6 +135,7 @@ class BetEngine(WebsiteOpener):
                     max_concurrent_bets=account_data.get("max_concurrent_bets", 3),
                     min_balance=account_data.get("min_balance", 100)
                 ))
+                print(f"Added account: {account_data.get('username')}")
                 
         # Ensure we have at least one account
         if not self.__accounts:
@@ -200,28 +204,159 @@ class BetEngine(WebsiteOpener):
                 
             # Try to get account balance
             try:
-                balance_element = self.driver.find_element(By.XPATH, "//div[contains(@class, 'balance')]")
-                balance_text = balance_element.text.strip()
-                # Extract numeric value from balance text
-                balance_value = re.search(r'[\d,.]+', balance_text)
-                if balance_value:
-                    # Remove commas and convert to float
-                    account.balance = float(balance_value.group().replace(',', ''))
-                    print(f"Account balance: {account.balance}")
-            except Exception as e:
-                print(f"Could not retrieve account balance: {e}")
+                # Try alternative XPath selectors
+                xpath_selectors = [
+                    '//*[@id="header_item"]/div/div/div/div[2]/div[2]/div/div[2]/div[1]/div[3]/div/div[2]',
+                    '//*[@id="header_item"]/div/div/div/div[2]/div[2]/div/div[2]/div[1]/div[2]/span',
+                    '//*[contains(@class, "balance")]',
+                    '//*[contains(text(), "₦")]'
+                ]
+                
+                for selector in xpath_selectors:
+                    try:
+                        balance_element = self.driver.find_element(By.XPATH, selector)
+                        print(f"Found balance with selector: {selector}")
+                        print(f"Balance element: {balance_element}")
+                        # Try different methods to get the text
+                        balance_text = balance_element.get_attribute("textContent") or balance_element.get_attribute("innerText") or balance_element.text
+                        print(f"Balance text: {balance_text}")
+                        if balance_text:
+                            balance_text = balance_text.strip()
+                            # Extract numeric value from balance text
+                            balance_value = re.search(r'[\d,.]+', balance_text)
+                            print(balance_value)
+                            if balance_value:
+                                # Remove commas and convert to float
+                                account.balance = float(balance_value.group().replace(',', ''))
+                                print(f"Account balance: {account.balance}")
+                                break
+                    except NoSuchElementException:
+                        continue
+                    
+                if account.balance == 0:
+                    # If all XPath selectors failed, try a more direct approach with JavaScript
+                    try:
+                        # Execute JavaScript to get the balance text
+                        js_result = self.driver.execute_script("""
+                            // Find elements that might contain the balance
+                            var elements = document.querySelectorAll('*');
+                            for (var i = 0; i < elements.length; i++) {
+                                var el = elements[i];
+                                var text = el.textContent || el.innerText;
+                                if (text && text.includes('₦')) {
+                                    return text;
+                                }
+                            }
+                            return null;
+                        """)
+                        
+                        if js_result:
+                            print(f"Found balance with JavaScript: {js_result}")
+                            balance_value = re.search(r'[\d,.]+', js_result)
+                            if balance_value:
+                                account.balance = float(balance_value.group().replace(',', ''))
+                                print(f"Account balance: {account.balance}")
+                    except Exception as js_error:
+                        print(f"JavaScript extraction failed: {js_error}")
+                        
+            except Exception as e2:
+                print(f"Could not retrieve account balance: {e2}")
+            # try: 
+            #     balance_element = self.driver.find_element(By.XPATH, '//*[@id="myaccount_dropdown_toggle"]/div[1]/div[2]/span')
+            #     print(f"Balance element: {balance_element}")
+            #     # Try different methods to get the text
+            #     balance_text = balance_element.get_attribute("textContent") or balance_element.get_attribute("innerText") or balance_element.text
+            #     print(f"Balance text: {balance_text}")
+            #     if balance_text:
+            #         balance_text = balance_text.strip()
+            #         # Extract numeric value from balance text
+            #         balance_value = re.search(r'[\d,.]+', balance_text)
+            #         print(balance_value)
+            #         if balance_value:
+            #             # Remove commas and convert to float
+            #             account.balance = float(balance_value.group().replace(',', ''))
+            #             print(f"Account balance: {account.balance}")
+            # except Exception as e:
+            #     try:
+            #         # Try alternative XPath selectors
+            #         xpath_selectors = [
+            #             '//*[@id="header_item"]/div/div/div/div[2]/div[2]/div/div[2]/div[1]/div[3]/div/div[2]',
+            #             '//*[@id="header_item"]/div/div/div/div[2]/div[2]/div/div[2]/div[1]/div[2]/span',
+            #             '//*[contains(@class, "balance")]',
+            #             '//*[contains(text(), "₦")]'
+            #         ]
+                    
+            #         for selector in xpath_selectors:
+            #             try:
+            #                 balance_element = self.driver.find_element(By.XPATH, selector)
+            #                 print(f"Found balance with selector: {selector}")
+            #                 print(f"Balance element: {balance_element}")
+            #                 # Try different methods to get the text
+            #                 balance_text = balance_element.get_attribute("textContent") or balance_element.get_attribute("innerText") or balance_element.text
+            #                 print(f"Balance text: {balance_text}")
+            #                 if balance_text:
+            #                     balance_text = balance_text.strip()
+            #                     # Extract numeric value from balance text
+            #                     balance_value = re.search(r'[\d,.]+', balance_text)
+            #                     print(balance_value)
+            #                     if balance_value:
+            #                         # Remove commas and convert to float
+            #                         account.balance = float(balance_value.group().replace(',', ''))
+            #                         print(f"Account balance: {account.balance}")
+            #                         break
+            #             except NoSuchElementException:
+            #                 continue
+                        
+            #         if account.balance == 0:
+            #             # If all XPath selectors failed, try a more direct approach with JavaScript
+            #             try:
+            #                 # Execute JavaScript to get the balance text
+            #                 js_result = self.driver.execute_script("""
+            #                     // Find elements that might contain the balance
+            #                     var elements = document.querySelectorAll('*');
+            #                     for (var i = 0; i < elements.length; i++) {
+            #                         var el = elements[i];
+            #                         var text = el.textContent || el.innerText;
+            #                         if (text && text.includes('₦')) {
+            #                             return text;
+            #                         }
+            #                     }
+            #                     return null;
+            #                 """)
+                            
+            #                 if js_result:
+            #                     print(f"Found balance with JavaScript: {js_result}")
+            #                     balance_value = re.search(r'[\d,.]+', js_result)
+            #                     if balance_value:
+            #                         account.balance = float(balance_value.group().replace(',', ''))
+            #                         print(f"Account balance: {account.balance}")
+            #             except Exception as js_error:
+            #                 print(f"JavaScript extraction failed: {js_error}")
+                            
+            #     except Exception as e2:
+            #         print(f"Could not retrieve account balance: {e2}")
                 
             print(f"Login successful for account: {account.username}")
         except Exception as e:
             print(f"Login failed for account: {account.username}: {e}")
             raise
 
-    def __search_event(self, home_team, away_team):
+    def __search_event(self, home_team, away_team, pinnacle_start_time=None):
         """
-        Search for an event on Bet9ja using team names
-        Returns the event ID if found, None otherwise
+        Search for an event on Bet9ja using team names and match start time
+        
+        Parameters:
+        - home_team: Home team name
+        - away_team: Away team name
+        - pinnacle_start_time: Start time from Pinnacle in milliseconds (unix timestamp)
+        
+        Returns:
+        - event ID if found, None otherwise
         """
         print(f"Searching for match: {home_team} vs {away_team}")
+        if pinnacle_start_time:
+            pinnacle_datetime = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(pinnacle_start_time)/1000))
+            print(f"Pinnacle start time: {pinnacle_datetime} (GMT)")
         
         # Try different search strategies
         search_strategies = [
@@ -236,6 +371,12 @@ class BetEngine(WebsiteOpener):
             for word in words:
                 if len(word) > 3 and word not in search_strategies:  # Only use words longer than 3 chars
                     search_strategies.append(word)
+        
+        # Store potential matches with scores for later evaluation
+        potential_matches = []
+        
+        # List of terms that indicate the wrong team variant
+        variant_indicators = ["ladies", "women", "u21", "u-21", "u23", "u-23", "youth", "junior", "reserve", "b team"]
         
         for search_term in search_strategies:
             print(f"Trying search term: {search_term}")
@@ -271,7 +412,7 @@ class BetEngine(WebsiteOpener):
                 if response.status_code == 401:
                     print("Session expired, logging in again...")
                     self.__do_login()
-                    return self.__search_event(home_team, away_team)
+                    return self.__search_event(home_team, away_team, pinnacle_start_time)
                 
                 search_results = response.json()
                 
@@ -282,12 +423,96 @@ class BetEngine(WebsiteOpener):
                             for event in sport_data["E"]:
                                 # Check if home and away team names match (partial match)
                                 event_name = event["DS"].lower()
+                                
+                                # Skip events with variant indicators that don't exist in the original team names
+                                should_skip = False
+                                for indicator in variant_indicators:
+                                    if (indicator in event_name and 
+                                        indicator not in home_team.lower() and 
+                                        indicator not in away_team.lower()):
+                                        print(f"Skipping variant team: {event['DS']}")
+                                        should_skip = True
+                                        break
+                                
+                                if should_skip:
+                                    continue
+                                
+                                # Start with a base match score
+                                match_score = 0
+                                
+                                # Calculate match score based on word matching
+                                home_words = set(word.lower() for word in home_team.split() if len(word) > 2)
+                                away_words = set(word.lower() for word in away_team.split() if len(word) > 2)
+                                event_words = set(word.lower() for word in event_name.split() if len(word) > 2)
+                                
+                                home_match_count = len(home_words.intersection(event_words))
+                                away_match_count = len(away_words.intersection(event_words))
+                                
+                                # Basic check if both team names are in the event - perfect match
                                 if (home_team.lower() in event_name and away_team.lower() in event_name):
-                                    print(f"Found match: {event['DS']} (ID: {event['ID']})")
-                                    return event["ID"]
+                                    # Perfect name match - both exact team names are in the event name
+                                    print(f"Found exact name match: {event['DS']} (ID: {event['ID']})")
+                                    match_score += 10  # Give a high score for exact match
+                                    
+                                # At least one word from each team must match
+                                if home_match_count > 0 and away_match_count > 0:
+                                    match_score += home_match_count + away_match_count
+                                else:
+                                    # Skip events that don't have at least one word from each team
+                                    continue
+                                
+                                # Check start time if available
+                                time_match_score = 0
+                                if pinnacle_start_time and "STARTDATE" in event:
+                                    bet9ja_start_time = event["STARTDATE"]
+                                    try:
+                                        # Parse Bet9ja time (assumed to be in GMT as noted)
+                                        bet9ja_datetime = time.strptime(bet9ja_start_time, '%Y-%m-%d %H:%M:%S')
+                                        bet9ja_timestamp = time.mktime(bet9ja_datetime) * 1000
+                                        
+                                        # Calculate time difference in hours
+                                        time_diff_hours = abs(int(pinnacle_start_time) - bet9ja_timestamp) / (1000 * 60 * 60)
+                                        
+                                        print(f"Time difference: {time_diff_hours:.2f} hours")
+                                        
+                                        # Score based on time difference:
+                                        # - Within 30 minutes: +5 points
+                                        # - Within 2 hours: +3 points
+                                        # - Within 6 hours: +1 point
+                                        # - Same day: +0.5 points
+                                        if time_diff_hours <= 0.5:
+                                            time_match_score = 5
+                                        elif time_diff_hours <= 2:
+                                            time_match_score = 3
+                                        elif time_diff_hours <= 6:
+                                            time_match_score = 1
+                                        elif time_diff_hours <= 24:
+                                            time_match_score = 0.5
+                                            
+                                        match_score += time_match_score
+                                        print(f"Time match score: +{time_match_score}")
+                                    except Exception as e:
+                                        print(f"Error parsing time: {e}")
+                                
+                                # Add to potential matches if score is positive
+                                if match_score > 0:
+                                    potential_matches.append({
+                                        "event_name": event["DS"],
+                                        "event_id": event["ID"],
+                                        "score": match_score,
+                                        "strategy": search_term,
+                                        "time_score": time_match_score
+                                    })
+                                    print(f"Potential match: {event['DS']} (Score: {match_score})")
             
             except Exception as e:
                 print(f"Error searching for event: {e}")
+        
+        # If we have potential matches, return the one with the highest score
+        if potential_matches:
+            best_match = max(potential_matches, key=lambda x: x["score"])
+            print(f"Best match: {best_match['event_name']} (ID: {best_match['event_id']}, Score: {best_match['score']})")
+            return best_match["event_id"]
         
         print("No matching event found on Bet9ja")
         return None
@@ -313,8 +538,8 @@ class BetEngine(WebsiteOpener):
             
             response = requests.get(
                 f"{self.__bet_host}/desktop/feapi/PalimpsestAjax/GetEvent?EVENTID={event_id}&v_cache_version=1.274.3.186",
-                data=form_data,
-                cookies=cookies,
+                # data=form_data,
+                # cookies=cookies,
                 headers=headers
             )
             
@@ -345,49 +570,55 @@ class BetEngine(WebsiteOpener):
         Returns:
         - True if bet was placed successfully, False otherwise
         """
-        # Get max concurrent bets from config
-        max_total_bets = self.__config.get("max_total_concurrent_bets", 5)
-        
-        # Count total current bets across all accounts
-        total_current_bets = sum(account.current_bets for account in self.__accounts)
-        
-        # Check if we've reached the global limit
-        if total_current_bets >= max_total_bets:
-            print(f"Reached global limit of {max_total_bets} concurrent bets. Queuing bet.")
+        try:
+            # Get max concurrent bets from config
+            max_total_bets = self.__config.get("max_total_concurrent_bets", 5)
+            
+            # Count total current bets across all accounts
+            total_current_bets = sum(account.current_bets for account in self.__accounts)
+            
+            # Check if we've reached the global limit
+            if total_current_bets >= max_total_bets:
+                print(f"Reached global limit of {max_total_bets} concurrent bets. Queuing bet.")
+                # Re-add to queue with a delay
+                threading.Timer(30.0, lambda: self.__bet_queue.put(bet_data)).start()
+                return False
+            
+            # Find an available account
+            for account in self.__accounts:
+                if account.can_place_bet():
+                    # Check if login is needed
+                    if account.needs_login():
+                        try:
+                            self.__do_login_for_account(account)
+                        except Exception as e:
+                            print(f"Failed to login to account {account.username}: {e}")
+                            continue  # Try next account
+                    
+                    # Try to place bet with this account
+                    account.increment_bets()
+                    success = self.__place_bet_for_account(
+                        account=account,
+                        bet_code=bet_data["bet_code"],
+                        odds=bet_data["odds"],
+                        modified_shaped_data=bet_data["modified_shaped_data"],
+                        bankroll=account.balance
+                    )
+                    
+                    if success:
+                        account.decrement_bets()
+                        print(f"Bet placed successfully with account {account.username}")
+                        return True
+            
+            print("No available accounts to place bet. Queuing for retry.")
             # Re-add to queue with a delay
-            threading.Timer(30.0, lambda: self.__bet_queue.put(bet_data)).start()
+            threading.Timer(60.0, lambda: self.__bet_queue.put(bet_data)).start()
             return False
-        
-        # Find an available account
-        for account in self.__accounts:
-            if account.can_place_bet():
-                # Check if login is needed
-                if account.needs_login():
-                    try:
-                        self.__do_login_for_account(account)
-                    except Exception as e:
-                        print(f"Failed to login to account {account.username}: {e}")
-                        continue  # Try next account
-                
-                # Try to place bet with this account
-                account.increment_bets()
-                success = self.__place_bet_for_account(
-                    account=account,
-                    bet_code=bet_data["bet_code"],
-                    odds=bet_data["odds"],
-                    modified_shaped_data=bet_data["modified_shaped_data"],
-                    bankroll=account.balance
-                )
-                
-                if success:
-                    account.decrement_bets()
-                    print(f"Bet placed successfully with account {account.username}")
-                    return True
-        
-        print("No available accounts to place bet. Queuing for retry.")
-        # Re-add to queue with a delay
-        threading.Timer(60.0, lambda: self.__bet_queue.put(bet_data)).start()
-        return False
+        except Exception as e:
+            print(f"Error in place_bet_with_available_account: {e}")
+            # Close browser on error
+            self.cleanup()
+            raise
 
     def __place_bet_for_account(self, account, bet_code, odds, modified_shaped_data, bankroll):
         """
@@ -1061,74 +1292,90 @@ class BetEngine(WebsiteOpener):
         Parameters:
         - shaped_data: The data from Pinnacle shaped according to BetEngine requirements
         """
-        print(f"Processing alert: {shaped_data}")
-        
-        # Validate shaped data
-        required_fields = ['game', 'category', 'match_type']
-        if not all(field in shaped_data for field in required_fields):
-            print("Invalid shaped data format")
-            return
+        try:
+            print(f"Processing alert: {shaped_data}")
             
-        # Get necessary information from shaped data
-        home_team = shaped_data["game"]["home"]
-        away_team = shaped_data["game"]["away"]
-        line_type = shaped_data["category"]["type"]
-        outcome = shaped_data["category"]["meta"]["team"]
-        original_points = shaped_data["category"]["meta"].get("value")
-        
-        # Determine if this is for first half or full match
-        is_first_half = False
-        if "periodNumber" in shaped_data and shaped_data["periodNumber"] == "1":
-            is_first_half = True
+            # Validate shaped data
+            required_fields = ['game', 'category', 'match_type']
+            if not all(field in shaped_data for field in required_fields):
+                print("Invalid shaped data format")
+                return
+                
+            # Get necessary information from shaped data
+            home_team = shaped_data["game"]["home"]
+            away_team = shaped_data["game"]["away"]
+            line_type = shaped_data["category"]["type"]
+            outcome = shaped_data["category"]["meta"]["team"]
+            original_points = shaped_data["category"]["meta"].get("value")
             
-        # Step 1: Search for the event on Bet9ja
-        event_id = self.__search_event(home_team, away_team)
-        if not event_id:
-            print("Event not found, cannot place bet")
-            return
+            # Get start time if available
+            pinnacle_start_time = shaped_data.get("starts")
+            if pinnacle_start_time:
+                print(f"Alert contains start time: {pinnacle_start_time}")
             
-        # Step 2: Get event details
-        event_details = self.__get_event_details(event_id)
-        if not event_details:
-            print("Could not get event details, cannot place bet")
-            return
+            # Determine if this is for first half or full match
+            is_first_half = False
+            if "periodNumber" in shaped_data and shaped_data["periodNumber"] == "1":
+                is_first_half = True
+                
+            # Step 1: Search for the event on Bet9ja
+            print(f"Searching for event: {home_team} vs {away_team}")
+            event_id = self.__search_event(home_team, away_team, pinnacle_start_time)
+            if not event_id:
+                print("Event not found, cannot place bet")
+                return
+                
+            # Step 2: Get event details
+            print(f"Getting event details for event: {event_id}")
+            event_details = self.__get_event_details(event_id)
+            if not event_details:
+                print("Could not get event details, cannot place bet")
+                return
+                
+            # Step 3: Find the market for the bet
+            print(f"Finding market for bet: {line_type} {outcome} {original_points}")
+            bet_code, bet_odds, adjusted_points = self.__find_market_bet_code_with_points(
+                event_details, 
+                line_type, 
+                original_points, 
+                outcome, 
+                is_first_half
+            )
             
-        # Step 3: Find the market for the bet
-        bet_code, bet_odds, adjusted_points = self.__find_market_bet_code_with_points(
-            event_details, 
-            line_type, 
-            original_points, 
-            outcome, 
-            is_first_half
-        )
-        
-        if not bet_code or not bet_odds:
-            print("Could not find appropriate market, cannot place bet")
-            return
+            if not bet_code or not bet_odds:
+                print("Could not find appropriate market, cannot place bet")
+                return
+                
+            # Create a modified shaped_data with the adjusted points
+            modified_shaped_data = shaped_data.copy()
+            modified_shaped_data["category"]["meta"]["value"] = adjusted_points
+            print(f"Using adjusted points: {adjusted_points} (original was: {original_points})")
             
-        # Create a modified shaped_data with the adjusted points
-        modified_shaped_data = shaped_data.copy()
-        modified_shaped_data["category"]["meta"]["value"] = adjusted_points
-        print(f"Using adjusted points: {adjusted_points} (original was: {original_points})")
-        
-        # Step 4: Calculate EV with the adjusted points
-        ev = self.__calculate_ev(bet_odds, modified_shaped_data)
-        
-        # Step 5: Place bet if EV is positive and above threshold
-        if ev > self.__min_ev:
-            print(f"Positive EV ({ev:.2f}%), placing bet")
+            # Step 4: Calculate EV with the adjusted points
+            print(f"Calculating EV with adjusted points: {adjusted_points}")
+            ev = self.__calculate_ev(bet_odds, modified_shaped_data)
             
-            # Calculate optimal stake using Kelly criterion            
-            success = self.__place_bet(f"{event_id}${bet_code}", bet_odds, modified_shaped_data)
-            
-            if success:
-                print(f"Successfully queued bet on {home_team} vs {away_team} - {line_type} {outcome} {adjusted_points} with stake {stake:.2f}")
+            # Step 5: Place bet if EV is positive and above threshold
+            print(f"EV: {ev:.2f}%")
+            if ev > self.__min_ev:
+                print(f"Positive EV ({ev:.2f}%), placing bet")
+                
+                # Calculate optimal stake using Kelly criterion            
+                success = self.__place_bet(f"{event_id}${bet_code}", bet_odds, modified_shaped_data)
+                
+                if success:
+                    print(f"Successfully queued bet on {home_team} vs {away_team} - {line_type} {outcome} {adjusted_points}")
+                else:
+                    print("Failed to queue bet")
             else:
-                print("Failed to queue bet")
-        else:
-            print(f"Negative or insufficient EV ({ev:.2f}%), not placing bet")
-            
-        return ev > self.__min_ev
+                print(f"Negative or insufficient EV ({ev:.2f}%), not placing bet")
+                
+            return ev > self.__min_ev
+        except Exception as e:
+            print(f"Error in notify method: {e}")
+            # Close browser on error
+            self.cleanup()
+            raise
 
     def __find_market_bet_code(self, event_details, line_type, points, outcome, is_first_half=False):
         """
@@ -1153,9 +1400,27 @@ class BetEngine(WebsiteOpener):
         )
         return bet_code, odds
 
+    def cleanup(self):
+        """Close browser and clean up resources"""
+        if self.__browser_open:
+            try:
+                print("Closing browser...")
+                self.close_browser()
+                self.__browser_open = False
+                print("Browser closed successfully")
+            except Exception as e:
+                print(f"Error closing browser: {e}")
+                
+    def __del__(self):
+        """Destructor to ensure browser is closed when object is garbage collected"""
+        self.cleanup()
+
 if __name__ == "__main__":
     """Main Application"""
-    bet_engine = BetEngine()
+    bet_engine = BetEngine(
+        headless=os.getenv("ENVIRONMENT") == "production",
+        config_file="config.json"
+    )
     test_data = {
         "game": {
             "away": "Manchester Utd",

@@ -135,18 +135,25 @@ class OddsEngine:
             print(f"Skipping already processed event + line type: {event_line_key}")
             return
             
-        # Skip alerts for matches that have already started
-        current_time_ms = int(time.time() * 1000)
-        match_start_time = int(alert.get("starts", 0))
-        if match_start_time <= current_time_ms:
-            print(f"Skipping alert for match that already started: {alert.get('home', '')} vs {alert.get('away', '')}")
-            return
-        
         # Skip alerts with "(Corners)" in team names
         home_team = alert.get("home", "")
         away_team = alert.get("away", "")
         if "(Corners)" in home_team or "(Corners)" in away_team:
             print(f"Skipping corners market: {home_team} vs {away_team}")
+            return
+        
+        # Skip alerts for matches that have already started (with timezone awareness)
+        current_time_ms = int(time.time() * 1000)  # Current time in UTC/GMT
+        match_start_time = int(alert.get("starts", 0))  # Pinnacle time is in UTC/GMT
+        
+        # Add a small buffer (5 minutes) to account for possible delays
+        buffer_ms = 5 * 60 * 1000
+        
+        if match_start_time <= current_time_ms - buffer_ms:
+            match_start_datetime = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(match_start_time/1000))
+            current_datetime = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(current_time_ms/1000))
+            print(f"Skipping alert for match that already started: {home_team} vs {away_team}")
+            print(f"Match start time (GMT): {match_start_datetime}, Current time (GMT): {current_datetime}")
             return
             
         # Shape the data for the bet engine
@@ -201,7 +208,8 @@ class OddsEngine:
             },
             "match_type": alert.get("type", ""),
             "periodNumber": alert.get("periodNumber", "0"),  # Default to main match
-            "eventId": alert.get("eventId")  # Include the event ID for fetching latest odds
+            "eventId": alert.get("eventId"),  # Include the event ID for fetching latest odds
+            "starts": alert.get("starts")  # Include the start time for better search matching
         }
         
         # Add the appropriate prices based on line type
