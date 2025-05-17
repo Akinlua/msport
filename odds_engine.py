@@ -75,6 +75,7 @@ class OddsEngine:
         print(f"Starting odds monitoring with interval of {interval} seconds")
         while self.__running:
             try:
+                print(f"Getting odds at {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
                 self.get_odds()
                 time.sleep(interval)
             except Exception as e:
@@ -149,7 +150,7 @@ class OddsEngine:
         # Add a small buffer (5 minutes) to account for possible delays
         buffer_ms = 5 * 60 * 1000
         
-        if match_start_time <= current_time_ms - buffer_ms:
+        if match_start_time <= current_time_ms:
             match_start_datetime = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(match_start_time/1000))
             current_datetime = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(current_time_ms/1000))
             print(f"Skipping alert for match that already started: {home_team} vs {away_team}")
@@ -213,7 +214,7 @@ class OddsEngine:
         }
         
         # Add the appropriate prices based on line type
-        if shaped_data["category"]["type"].lower() == "moneyline":
+        if shaped_data["category"]["type"].lower() == "money_line":
             if "priceHome" in alert:
                 shaped_data["priceHome"] = alert["priceHome"]
             if "priceAway" in alert:

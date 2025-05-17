@@ -46,7 +46,12 @@ class BetAccount:
                 self.balance >= self.min_balance)
         
     def set_cookie_jar(self, cookies):
-        self.cookie_jar = {cookie["name"]: cookie["value"] for cookie in cookies}
+        # Handle both formats: list of cookie dictionaries (from Selenium) or direct dictionary
+        if isinstance(cookies, list):
+            self.cookie_jar = {cookie["name"]: cookie["value"] for cookie in cookies}
+        else:
+            # Assume it's already a dictionary
+            self.cookie_jar = cookies
         self.last_login_time = time.time()
         
     def needs_login(self, max_session_time=3600):  # 1 hour max session time
@@ -68,7 +73,10 @@ class BetEngine(WebsiteOpener):
                  min_ev=float(os.getenv("MIN_EV", "0")),
                  config_file="config.json"):
         print(f"Initializing BetEngine with min_ev: {min_ev}")
-        super().__init__(headless)
+        # Only initialize browser if needed for certain operations
+        self.__browser_initialized = False
+        self.__browser_open = False
+        self.__headless = headless
         print(f"BetEngine initialized with headless: {headless}")
         self.__bet_api_host = bet_api_host
         self.__bet_host = bet_host
@@ -78,7 +86,14 @@ class BetEngine(WebsiteOpener):
         self.__load_config(config_file)
         self.__setup_accounts()
         self.__start_bet_worker()
-        self.__browser_open = True
+        
+    def _initialize_browser_if_needed(self):
+        """Initialize the browser if it hasn't been initialized yet"""
+        if not self.__browser_initialized:
+            super().__init__(self.__headless)
+            self.__browser_initialized = True
+            self.__browser_open = True
+            print("Browser initialized")
         
     def __load_config(self, config_file):
         """Load configuration from JSON file"""
@@ -179,164 +194,66 @@ class BetEngine(WebsiteOpener):
             raise ValueError("No betting accounts configured")
             
     def __do_login_for_account(self, account):
-        """Log in to Bet9ja website with a specific account"""
+        """Log in to Bet9ja website with a specific account using API"""
         print(f"Logging in to Bet9ja with account: {account.username}")
         
         if not account.username or not account.password:
             raise ValueError("Bet9ja username or password not found for account")
-            
-        self.open_url(f"{self.__bet_host}")
-        self.driver.implicitly_wait(10)
         
         try:
-            self.driver.find_element(By.XPATH, "//*[@id='header_item']/div/div/div/div[2]/div[3]/div[1]").click()
-            self.driver.find_element(By.XPATH, "//*[@id='username']").send_keys(account.username)
-            self.driver.find_element(By.XPATH, "//*[@id='password']").send_keys(account.password)
-            self.driver.find_element(By.XPATH, "//*[@id='header_item']/div/div/div/div[2]/div[3]/div[2]/div[1]/div[3]").click()
-            time.sleep(5)
+            # Prepare login data as form-data
+            login_data = {
+                'username': account.username,
+                'password': account.password
+            }
+            
+            headers = {
+                "User-Agent": "Mozilla/5.0",
+                "Accept": "application/json",
+                "Content-Type": "application/x-www-form-urlencoded"
+            }
+            
+            # Make the login request
+            login_url = f"{self.__bet_host}/desktop/feapi/AuthAjax/Login?v_cache_version=1.276.0.187"
+            login_response = requests.post(
+                login_url,
+                data=login_data,
+                headers=headers
+            )
+            
+            # Check for successful login
+            if login_response.status_code != 200:
+                print(f"Login failed with status code: {login_response.status_code}")
+                raise Exception(f"Login failed with status code: {login_response.status_code}")
+            
+            # print(f"Login response: {login_response.text}")
+            
+            # Extract livsid cookie from response headers
+            cookies = {}
+            if 'set-cookie' in login_response.headers:
+                cookie_header = login_response.headers['set-cookie']
+                print(f"Set-Cookie header: {cookie_header}")
+                livsid_match = re.search(r'livsid=([^;]+)', cookie_header)
+                if livsid_match:
+                    cookies['livsid'] = livsid_match.group(1)
+                    print(f"Extracted livsid cookie: {cookies['livsid']}")
             
             # Store cookies in the account
-            account.set_cookie_jar(self.driver.get_cookies())
+            account.set_cookie_jar(cookies)
             
             # If this is the first account, also store cookies in the class for search functionality
             if self.__accounts and account == self.__accounts[0]:
                 self.__cookie_jar = account.cookie_jar
-                
-            # Try to get account balance
-            try:
-                # Try alternative XPath selectors
-                xpath_selectors = [
-                    '//*[@id="header_item"]/div/div/div/div[2]/div[2]/div/div[2]/div[1]/div[3]/div/div[2]',
-                    '//*[@id="header_item"]/div/div/div/div[2]/div[2]/div/div[2]/div[1]/div[2]/span',
-                    '//*[contains(@class, "balance")]',
-                    '//*[contains(text(), "₦")]'
-                ]
-                
-                for selector in xpath_selectors:
-                    try:
-                        balance_element = self.driver.find_element(By.XPATH, selector)
-                        print(f"Found balance with selector: {selector}")
-                        print(f"Balance element: {balance_element}")
-                        # Try different methods to get the text
-                        balance_text = balance_element.get_attribute("textContent") or balance_element.get_attribute("innerText") or balance_element.text
-                        print(f"Balance text: {balance_text}")
-                        if balance_text:
-                            balance_text = balance_text.strip()
-                            # Extract numeric value from balance text
-                            balance_value = re.search(r'[\d,.]+', balance_text)
-                            print(balance_value)
-                            if balance_value:
-                                # Remove commas and convert to float
-                                account.balance = float(balance_value.group().replace(',', ''))
-                                print(f"Account balance: {account.balance}")
-                                break
-                    except NoSuchElementException:
-                        continue
-                    
-                if account.balance == 0:
-                    # If all XPath selectors failed, try a more direct approach with JavaScript
-                    try:
-                        # Execute JavaScript to get the balance text
-                        js_result = self.driver.execute_script("""
-                            // Find elements that might contain the balance
-                            var elements = document.querySelectorAll('*');
-                            for (var i = 0; i < elements.length; i++) {
-                                var el = elements[i];
-                                var text = el.textContent || el.innerText;
-                                if (text && text.includes('₦')) {
-                                    return text;
-                                }
-                            }
-                            return null;
-                        """)
-                        
-                        if js_result:
-                            print(f"Found balance with JavaScript: {js_result}")
-                            balance_value = re.search(r'[\d,.]+', js_result)
-                            if balance_value:
-                                account.balance = float(balance_value.group().replace(',', ''))
-                                print(f"Account balance: {account.balance}")
-                    except Exception as js_error:
-                        print(f"JavaScript extraction failed: {js_error}")
-                        
-            except Exception as e2:
-                print(f"Could not retrieve account balance: {e2}")
-            # try: 
-            #     balance_element = self.driver.find_element(By.XPATH, '//*[@id="myaccount_dropdown_toggle"]/div[1]/div[2]/span')
-            #     print(f"Balance element: {balance_element}")
-            #     # Try different methods to get the text
-            #     balance_text = balance_element.get_attribute("textContent") or balance_element.get_attribute("innerText") or balance_element.text
-            #     print(f"Balance text: {balance_text}")
-            #     if balance_text:
-            #         balance_text = balance_text.strip()
-            #         # Extract numeric value from balance text
-            #         balance_value = re.search(r'[\d,.]+', balance_text)
-            #         print(balance_value)
-            #         if balance_value:
-            #             # Remove commas and convert to float
-            #             account.balance = float(balance_value.group().replace(',', ''))
-            #             print(f"Account balance: {account.balance}")
-            # except Exception as e:
-            #     try:
-            #         # Try alternative XPath selectors
-            #         xpath_selectors = [
-            #             '//*[@id="header_item"]/div/div/div/div[2]/div[2]/div/div[2]/div[1]/div[3]/div/div[2]',
-            #             '//*[@id="header_item"]/div/div/div/div[2]/div[2]/div/div[2]/div[1]/div[2]/span',
-            #             '//*[contains(@class, "balance")]',
-            #             '//*[contains(text(), "₦")]'
-            #         ]
-                    
-            #         for selector in xpath_selectors:
-            #             try:
-            #                 balance_element = self.driver.find_element(By.XPATH, selector)
-            #                 print(f"Found balance with selector: {selector}")
-            #                 print(f"Balance element: {balance_element}")
-            #                 # Try different methods to get the text
-            #                 balance_text = balance_element.get_attribute("textContent") or balance_element.get_attribute("innerText") or balance_element.text
-            #                 print(f"Balance text: {balance_text}")
-            #                 if balance_text:
-            #                     balance_text = balance_text.strip()
-            #                     # Extract numeric value from balance text
-            #                     balance_value = re.search(r'[\d,.]+', balance_text)
-            #                     print(balance_value)
-            #                     if balance_value:
-            #                         # Remove commas and convert to float
-            #                         account.balance = float(balance_value.group().replace(',', ''))
-            #                         print(f"Account balance: {account.balance}")
-            #                         break
-            #             except NoSuchElementException:
-            #                 continue
-                        
-            #         if account.balance == 0:
-            #             # If all XPath selectors failed, try a more direct approach with JavaScript
-            #             try:
-            #                 # Execute JavaScript to get the balance text
-            #                 js_result = self.driver.execute_script("""
-            #                     // Find elements that might contain the balance
-            #                     var elements = document.querySelectorAll('*');
-            #                     for (var i = 0; i < elements.length; i++) {
-            #                         var el = elements[i];
-            #                         var text = el.textContent || el.innerText;
-            #                         if (text && text.includes('₦')) {
-            #                             return text;
-            #                         }
-            #                     }
-            #                     return null;
-            #                 """)
-                            
-            #                 if js_result:
-            #                     print(f"Found balance with JavaScript: {js_result}")
-            #                     balance_value = re.search(r'[\d,.]+', js_result)
-            #                     if balance_value:
-            #                         account.balance = float(balance_value.group().replace(',', ''))
-            #                         print(f"Account balance: {account.balance}")
-            #             except Exception as js_error:
-            #                 print(f"JavaScript extraction failed: {js_error}")
-                            
-            #     except Exception as e2:
-            #         print(f"Could not retrieve account balance: {e2}")
-                
+
+            user_data = login_response.json()
+            if user_data.get("R") == "OK" and "D" in user_data and "balance" in user_data["D"]:
+                    balance_data = user_data["D"]["balance"]
+                    if "amount" in balance_data:
+                        account.balance = float(balance_data["amount"])
+                        print(f"Account balance: {account.balance}")
+            
             print(f"Login successful for account: {account.username}")
+            return True
         except Exception as e:
             print(f"Login failed for account: {account.username}: {e}")
             raise
@@ -379,7 +296,7 @@ class BetEngine(WebsiteOpener):
         variant_indicators = ["ladies", "women", "u21", "u-21", "u23", "u-23", "youth", "junior", "reserve", "b team"]
         
         for search_term in search_strategies:
-            print(f"Trying search term: {search_term}")
+            # print(f"Trying search term: {search_term}")
             
             form_data = {
                 'TERM': search_term,
@@ -430,7 +347,7 @@ class BetEngine(WebsiteOpener):
                                     if (indicator in event_name and 
                                         indicator not in home_team.lower() and 
                                         indicator not in away_team.lower()):
-                                        print(f"Skipping variant team: {event['DS']}")
+                                        # print(f"Skipping variant team: {event['DS']}")
                                         should_skip = True
                                         break
                                 
@@ -473,7 +390,7 @@ class BetEngine(WebsiteOpener):
                                         # Calculate time difference in hours
                                         time_diff_hours = abs(int(pinnacle_start_time) - bet9ja_timestamp) / (1000 * 60 * 60)
                                         
-                                        print(f"Time difference: {time_diff_hours:.2f} hours")
+                                        # print(f"Time difference: {time_diff_hours:.2f} hours")
                                         
                                         # Score based on time difference:
                                         # - Within 30 minutes: +5 points
@@ -490,7 +407,7 @@ class BetEngine(WebsiteOpener):
                                             time_match_score = 0.5
                                             
                                         match_score += time_match_score
-                                        print(f"Time match score: +{time_match_score}")
+                                        # print(f"Time match score: +{time_match_score}")
                                     except Exception as e:
                                         print(f"Error parsing time: {e}")
                                 
@@ -503,7 +420,7 @@ class BetEngine(WebsiteOpener):
                                         "strategy": search_term,
                                         "time_score": time_match_score
                                     })
-                                    print(f"Potential match: {event['DS']} (Score: {match_score})")
+                                    # print(f"Potential match: {event['DS']} (Score: {match_score})")
             
             except Exception as e:
                 print(f"Error searching for event: {e}")
@@ -597,7 +514,7 @@ class BetEngine(WebsiteOpener):
                     
                     # Try to place bet with this account
                     account.increment_bets()
-                    success = self.__place_bet_for_account(
+                    success, stake = self.__place_bet_for_account(
                         account=account,
                         bet_code=bet_data["bet_code"],
                         odds=bet_data["odds"],
@@ -607,8 +524,13 @@ class BetEngine(WebsiteOpener):
                     
                     if success:
                         account.decrement_bets()
+                        # dedcue from balance
+                        account.balance -= stake
                         print(f"Bet placed successfully with account {account.username}")
                         return True
+                    else:
+                        # If bet failed, decrement the bet counter
+                        account.decrement_bets()
             
             print("No available accounts to place bet. Queuing for retry.")
             # Re-add to queue with a delay
@@ -632,7 +554,7 @@ class BetEngine(WebsiteOpener):
         - bankroll: The bankroll for the account
         
         Returns:
-        - True if bet was placed successfully, False otherwise
+        - Tuple of (success, stake) where success is True if bet was placed successfully
         """
         print(f"Placing bet with account {account.username}: {bet_code} with odds {odds}")
 
@@ -684,31 +606,34 @@ class BetEngine(WebsiteOpener):
                 cookies=account.cookie_jar,
                 headers=headers
             )
+            print("--------------------------------")
+            print(form_data)
+            print("--------------------------------")
             
             if response.status_code == 401:
                 print(f"Session expired for account {account.username}, logging in again...")
                 self.__do_login_for_account(account)
-                return self.__place_bet_for_account(account, bet_code, odds, stake)
+                return self.__place_bet_for_account(account, bet_code, odds, modified_shaped_data, bankroll)
             
             response_data = response.json()
             if response_data.get("status") == -1 or response_data["error"].get("message") == "Invalid session" or response_data["error"].get("code") == 114:
                 print(f"Session expired for account {account.username}, logging in again...")
                 self.__do_login_for_account(account)
-                return self.__place_bet_for_account(account, bet_code, odds, stake)
+                return self.__place_bet_for_account(account, bet_code, odds, modified_shaped_data, bankroll)
             
             print(f"Bet placement response for account {account.username}: {response_data}")
             
             # Check if the bet was placed successfully
             if response_data.get("status") == 1:
                 print(f"Bet placed successfully with account {account.username}!")
-                return True
+                return True, stake
             else:
                 print(f"Failed to place bet with account {account.username}: {response_data}")
-                return False
+                return False, stake
                 
         except Exception as e:
             print(f"Error placing bet with account {account.username}: {e}")
-            return False
+            return False, stake
 
     def __place_bet(self, bet_code, odds, modified_shaped_data):
         """
@@ -758,7 +683,7 @@ class BetEngine(WebsiteOpener):
         odds_data = event_details["O"]
         
         # Handle MONEYLINE bets (1X2 in Bet9ja)
-        if line_type.lower() == "moneyline":
+        if line_type.lower() == "money_line":
             # Moneyline doesn't have points, so we'll use None
             adjusted_points = None
             
@@ -1011,7 +936,7 @@ class BetEngine(WebsiteOpener):
         if not latest_prices:
             print("Using odds from original alert as fallback")
             # Get prices from shaped_data based on line type
-            if line_type == "moneyline":
+            if line_type == "money_line":
                 # For moneyline, we use home, away, and draw prices
                 decimal_prices = {}
                 if "priceHome" in shaped_data:
@@ -1122,7 +1047,7 @@ class BetEngine(WebsiteOpener):
             # Extract the appropriate odds based on line type
             decimal_prices = {}
             
-            if line_type == "moneyline":
+            if line_type == "money_line":
                 money_line = period.get("money_line", {})
                 if "home" in money_line:
                     decimal_prices["home"] = float(money_line["home"])
@@ -1402,7 +1327,7 @@ class BetEngine(WebsiteOpener):
 
     def cleanup(self):
         """Close browser and clean up resources"""
-        if self.__browser_open:
+        if self.__browser_open and self.__browser_initialized:
             try:
                 print("Closing browser...")
                 self.close_browser()
