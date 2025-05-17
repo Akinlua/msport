@@ -6,11 +6,11 @@
             "active": true,
             "max_concurrent_bets": 3,
             "min_balance": 100,
-            "proxy": "http://proxy1.example.com:8080"
+            "proxy": null
         }
     ],
     "max_total_concurrent_bets": 5,
-    "use_proxies": true,
+    "use_proxies": false,
     "bet_settings": {
         "min_ev": 5.5,
         "kelly_fraction": 0.3,
