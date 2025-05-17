@@ -22,12 +22,13 @@ class BetAccount:
     """
     Represents a single Bet9ja account with its own login credentials and cookie jar
     """
-    def __init__(self, username, password, active=True, max_concurrent_bets=3, min_balance=100):
+    def __init__(self, username, password, active=True, max_concurrent_bets=3, min_balance=100, proxy=None):
         self.username = username
         self.password = password
         self.active = active
         self.max_concurrent_bets = max_concurrent_bets
         self.min_balance = min_balance
+        self.proxy = proxy  # Format: "http://user:pass@host:port" or "http://host:port"
         self.cookie_jar = None
         self.current_bets = 0
         self.last_login_time = 0
@@ -57,6 +58,15 @@ class BetAccount:
     def needs_login(self, max_session_time=3600):  # 1 hour max session time
         return (self.cookie_jar is None or 
                 (time.time() - self.last_login_time) > max_session_time)
+
+    def get_proxies(self):
+        """Return proxies dictionary for requests if proxy is configured"""
+        if not self.proxy:
+            return None
+        return {
+            'http': self.proxy,
+            'https': self.proxy
+        }
 
 class BetEngine(WebsiteOpener):
     """
@@ -112,6 +122,7 @@ class BetEngine(WebsiteOpener):
             self.__config = {
                 "accounts": [],
                 "max_total_concurrent_bets": 5,
+                "use_proxies": False,  # Global flag to enable/disable proxies
                 "bet_settings": {
                     "min_ev": self.__min_ev,
                     "kelly_fraction": 0.3,
@@ -148,7 +159,8 @@ class BetEngine(WebsiteOpener):
                     password=account_data.get("password"),
                     active=account_data.get("active", True),
                     max_concurrent_bets=account_data.get("max_concurrent_bets", 3),
-                    min_balance=account_data.get("min_balance", 100)
+                    min_balance=account_data.get("min_balance", 100),
+                    proxy=account_data.get("proxy")
                 ))
                 print(f"Added account: {account_data.get('username')}")
                 
@@ -213,12 +225,18 @@ class BetEngine(WebsiteOpener):
                 "Content-Type": "application/x-www-form-urlencoded"
             }
             
+            # Get proxies if configured
+            proxies = account.get_proxies()
+            if proxies:
+                print(f"Using proxy for login: {account.proxy}")
+            
             # Make the login request
             login_url = f"{self.__bet_host}/desktop/feapi/AuthAjax/Login?v_cache_version=1.276.0.187"
             login_response = requests.post(
                 login_url,
                 data=login_data,
-                headers=headers
+                headers=headers,
+                proxies=proxies
             )
             
             # Check for successful login
@@ -244,13 +262,13 @@ class BetEngine(WebsiteOpener):
             # If this is the first account, also store cookies in the class for search functionality
             if self.__accounts and account == self.__accounts[0]:
                 self.__cookie_jar = account.cookie_jar
-
+            
             user_data = login_response.json()
             if user_data.get("R") == "OK" and "D" in user_data and "balance" in user_data["D"]:
-                    balance_data = user_data["D"]["balance"]
-                    if "amount" in balance_data:
-                        account.balance = float(balance_data["amount"])
-                        print(f"Account balance: {account.balance}")
+                balance_data = user_data["D"]["balance"]
+                if "amount" in balance_data:
+                    account.balance = float(balance_data["amount"])
+                    print(f"Account balance: {account.balance}")
             
             print(f"Login successful for account: {account.username}")
             return True
@@ -295,6 +313,13 @@ class BetEngine(WebsiteOpener):
         # List of terms that indicate the wrong team variant
         variant_indicators = ["ladies", "women", "u21", "u-21", "u23", "u-23", "youth", "junior", "reserve", "b team"]
         
+        # Get proxy from first account if available
+        proxies = None
+        if self.__accounts and hasattr(self.__accounts[0], 'get_proxies'):
+            proxies = self.__accounts[0].get_proxies()
+            if proxies:
+                print(f"Using proxy for search: {self.__accounts[0].proxy}")
+        
         for search_term in search_strategies:
             # print(f"Trying search term: {search_term}")
             
@@ -323,7 +348,8 @@ class BetEngine(WebsiteOpener):
                     f"{self.__bet_api_host}/sportsbook/search/SearchV2?source=desktop&v_cache_version=1.274.3.186",
                     data=form_data,
                     cookies=cookies,
-                    headers=headers
+                    headers=headers,
+                    # proxies=proxies
                 )
                 
                 if response.status_code == 401:
@@ -449,6 +475,13 @@ class BetEngine(WebsiteOpener):
             "Content-Type": "application/x-www-form-urlencoded"
         }
         
+        # Get proxy from first account if available
+        proxies = None
+        if self.__accounts and hasattr(self.__accounts[0], 'get_proxies'):
+            proxies = self.__accounts[0].get_proxies()
+            if proxies:
+                print(f"Using proxy for event details: {self.__accounts[0].proxy}")
+        
         try:
             # Use the first account's cookie jar for getting event details
             cookies = self.__cookie_jar
@@ -457,7 +490,8 @@ class BetEngine(WebsiteOpener):
                 f"{self.__bet_host}/desktop/feapi/PalimpsestAjax/GetEvent?EVENTID={event_id}&v_cache_version=1.274.3.186",
                 # data=form_data,
                 # cookies=cookies,
-                headers=headers
+                headers=headers,
+                # proxies=proxies
             )
             
             if response.status_code == 401:
@@ -599,12 +633,18 @@ class BetEngine(WebsiteOpener):
             "Content-Type": "application/x-www-form-urlencoded"
         }
         
+        # Get proxies if configured
+        proxies = account.get_proxies()
+        if proxies:
+            print(f"Using proxy for bet placement: {account.proxy}")
+        
         try:
             response = requests.post(
                 f"{self.__bet_api_host}/sportsbook/placebet/PlacebetV2?source=desktop&v_cache_version=1.274.3.186",
                 data=form_data,
                 cookies=account.cookie_jar,
-                headers=headers
+                headers=headers,
+                proxies=proxies
             )
             print("--------------------------------")
             print(form_data)
@@ -1023,11 +1063,18 @@ class BetEngine(WebsiteOpener):
             print("Pinnacle Events API host not configured")
             return None
             
+        # Get proxy from first account if available
+        proxies = None
+        if self.__accounts and hasattr(self.__accounts[0], 'get_proxies'):
+            proxies = self.__accounts[0].get_proxies()
+            if proxies:
+                print(f"Using proxy for Pinnacle odds: {self.__accounts[0].proxy}")
+            
         try:
             url = f"{pinnacle_api_host}/events/{event_id}"
             print(f"Fetching latest odds from: {url}")
             
-            response = requests.get(url)
+            response = requests.get(url, proxies=proxies)
             if response.status_code != 200:
                 print(f"Failed to fetch latest odds: HTTP {response.status_code}")
                 return None
