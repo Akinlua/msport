@@ -205,6 +205,27 @@ class BetEngine(WebsiteOpener):
         else:
             raise ValueError("No betting accounts configured")
             
+    def __check_ip_address(self, using_proxy=False, proxy_url=None):
+        """Check and log the current IP address being used"""
+        try:
+            # Use a service that returns the client's IP address
+            ip_check_url = "https://api.ipify.org?format=json"
+            response = requests.get(ip_check_url, proxies=proxy_url)
+            if response.status_code == 200:
+                ip_data = response.json()
+                if "ip" in ip_data:
+                    ip_address = ip_data["ip"]
+                    if using_proxy:
+                        print(f"✅ Using proxy - Current IP address: {ip_address}")
+                    else:
+                        print(f"Current IP address (no proxy): {ip_address}")
+                    return ip_address
+            print("Failed to get IP address")
+            return None
+        except Exception as e:
+            print(f"Error checking IP address: {e}")
+            return None
+            
     def __do_login_for_account(self, account):
         """Log in to Bet9ja website with a specific account using API"""
         print(f"Logging in to Bet9ja with account: {account.username}")
@@ -229,6 +250,11 @@ class BetEngine(WebsiteOpener):
             proxies = account.get_proxies()
             if proxies:
                 print(f"Using proxy for login: {account.proxy}")
+                # Check IP with proxy
+                self.__check_ip_address(using_proxy=True, proxy_url=proxies)
+            else:
+                # Check IP without proxy
+                self.__check_ip_address(using_proxy=False)
             
             # Make the login request
             login_url = f"{self.__bet_host}/desktop/feapi/AuthAjax/Login?v_cache_version=1.276.0.187"
@@ -637,6 +663,11 @@ class BetEngine(WebsiteOpener):
         proxies = account.get_proxies()
         if proxies:
             print(f"Using proxy for bet placement: {account.proxy}")
+            # Check IP with proxy
+            self.__check_ip_address(using_proxy=True, proxy_url=proxies)
+        else:
+            # Check IP without proxy
+            self.__check_ip_address(using_proxy=False)
         
         try:
             response = requests.post(
