@@ -1089,7 +1089,7 @@ class BetEngine(WebsiteOpener):
             print("No event ID provided, cannot fetch latest odds")
             return None
             
-        pinnacle_api_host = os.getenv("PINNACLE_ODDS_HOST")
+        pinnacle_api_host = os.getenv("PINNACLE_HOST")
         if not pinnacle_api_host:
             print("Pinnacle Events API host not configured")
             return None
