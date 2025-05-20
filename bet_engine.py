@@ -347,7 +347,7 @@ class BetEngine(WebsiteOpener):
                 print(f"Using proxy for search: {self.__accounts[0].proxy}")
         
         for search_term in search_strategies:
-            # print(f"Trying search term: {search_term}")
+            print(f"Trying search term: {search_term}")
             
             form_data = {
                 'TERM': search_term,
