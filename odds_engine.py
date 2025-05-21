@@ -158,6 +158,17 @@ class OddsEngine:
         away_team = alert.get("away", "")
         if "(Corners)" in home_team or "(Corners)" in away_team:
             print(f"Skipping corners market: {home_team} vs {away_team}")
+            self.__processed_alerts.add(alert_id)
+            self.__processed_event_line_types.add(event_line_key)
+            self.__last_processed_timestamp = max(self.__last_processed_timestamp, int(alert.get("timestamp", 0)))
+            
+            # Limit the size of processed alerts set to prevent memory growth
+            if len(self.__processed_alerts) > 1000:
+                self.__processed_alerts = set(list(self.__processed_alerts)[-1000:])
+                
+            # Also limit the event + line type combinations set
+            if len(self.__processed_event_line_types) > 2000:
+                self.__processed_event_line_types = set(list(self.__processed_event_line_types)[-2000:])
             return
         
         # Skip alerts for matches that have already started (with timezone awareness)
@@ -172,6 +183,17 @@ class OddsEngine:
             current_datetime = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(current_time_ms/1000))
             print(f"Skipping alert for match that already started: {home_team} vs {away_team}")
             print(f"Match start time (GMT): {match_start_datetime}, Current time (GMT): {current_datetime}")
+            self.__processed_alerts.add(alert_id)
+            self.__processed_event_line_types.add(event_line_key)
+            self.__last_processed_timestamp = max(self.__last_processed_timestamp, int(alert.get("timestamp", 0)))
+            
+            # Limit the size of processed alerts set to prevent memory growth
+            if len(self.__processed_alerts) > 1000:
+                self.__processed_alerts = set(list(self.__processed_alerts)[-1000:])
+                
+            # Also limit the event + line type combinations set
+            if len(self.__processed_event_line_types) > 2000:
+                self.__processed_event_line_types = set(list(self.__processed_event_line_types)[-2000:])
             return
             
         # Shape the data for the bet engine
