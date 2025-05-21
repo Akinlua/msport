@@ -731,7 +731,7 @@ class BetEngine(WebsiteOpener):
         self.__bet_queue.put(bet_data)
         return True  # Return True as the bet was queued successfully
 
-    def __find_market_bet_code_with_points(self, event_details, line_type, points, outcome, is_first_half=False, sport_id=1):
+    def __find_market_bet_code_with_points(self, event_details, line_type, points, outcome, is_first_half=False, sport_id=1, home_team=None, away_team=None):
         """
         Find the appropriate bet code in the Bet9ja event details and return the adjusted points value
         
@@ -746,7 +746,8 @@ class BetEngine(WebsiteOpener):
         Returns:
         - Tuple of (bet_code, odds, adjusted_points)
         """
-        print(f"Finding market for: {line_type} - {outcome} - {points} - First Half: {is_first_half} - Sport: {'Basketball' if sport_id == 3 else 'Soccer'}")
+        print(f"sport id {sport_id}")
+        print(f"Finding market for Game: {home_team} vs {away_team}: {line_type} - {outcome} - {points} - First Half: {is_first_half} - Sport: {'Basketball' if sport_id == 3 else 'Soccer'}")
         
         if "O" not in event_details:
             print("No market odds found in event details")
@@ -1382,7 +1383,9 @@ class BetEngine(WebsiteOpener):
                 original_points, 
                 outcome, 
                 is_first_half,
-                sport_id
+                sport_id,
+                home_team,
+                away_team
             )
             
             if not bet_code or not bet_odds:
@@ -1420,7 +1423,7 @@ class BetEngine(WebsiteOpener):
             self.cleanup()
             raise
 
-    def __find_market_bet_code(self, event_details, line_type, points, outcome, is_first_half=False, sport_id=1):
+    def __find_market_bet_code(self, event_details, line_type, points, outcome, is_first_half=False, sport_id=1, home_team=None, away_team=None):
         """
         DEPRECATED: Use __find_market_bet_code_with_points instead
         This method is kept for backward compatibility.
@@ -1440,7 +1443,7 @@ class BetEngine(WebsiteOpener):
         """
         # Forward to the new method and discard the adjusted points
         bet_code, odds, _ = self.__find_market_bet_code_with_points(
-            event_details, line_type, points, outcome, is_first_half, sport_id
+            event_details, line_type, points, outcome, is_first_half, sport_id, home_team, away_team
         )
         return bet_code, odds
 
