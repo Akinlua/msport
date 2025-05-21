@@ -747,7 +747,7 @@ class BetEngine(WebsiteOpener):
         - Tuple of (bet_code, odds, adjusted_points)
         """
         print(f"sport id {sport_id}")
-        print(f"Finding market for Game: {home_team} vs {away_team}: {line_type} - {outcome} - {points} - First Half: {is_first_half} - Sport: {'Basketball' if sport_id == 3 else 'Soccer'}")
+        print(f"Finding market for Game: {home_team} vs {away_team}: {line_type} - {outcome} - {points} - First Half: {is_first_half} - Sport: {'Basketball' if sport_id == 3 or sport_id == "3" else 'Soccer'}")
         
         if "O" not in event_details:
             print("No market odds found in event details")
@@ -756,7 +756,7 @@ class BetEngine(WebsiteOpener):
         odds_data = event_details["O"]
         
         # Use different market prefixes based on sport
-        is_basketball = (sport_id == 3)
+        is_basketball = (sport_id == "3" or sport_id == 3)
         
         # Handle MONEYLINE bets (1X2 in Bet9ja)
         if line_type.lower() == "money_line":
@@ -1349,7 +1349,7 @@ class BetEngine(WebsiteOpener):
             original_points = shaped_data["category"]["meta"].get("value")
             
             # Get sport ID (1 for soccer, 3 for basketball)
-            sport_id = shaped_data.get("sportId", 1)  # Default to soccer if not specified
+            sport_id = shaped_data.get("sportId", 0)  # Default to soccer if not specified
             
             # Get start time if available
             pinnacle_start_time = shaped_data.get("starts")

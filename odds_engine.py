@@ -267,7 +267,9 @@ class OddsEngine:
             return None
             
         # Get sport id (1 for soccer, 3 for basketball)
-        sport_id = alert.get("sport_id", 1)  # Default to soccer if not specified
+        print("alert ________________________")
+        print(alert)
+        sport_id = alert.get("sportId", 0)  # Default to soccer if not specified
         
         shaped_data = {
             "game": {
