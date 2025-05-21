@@ -26,6 +26,7 @@ class OddsEngine:
         self.__last_processed_timestamp = int(time.time()) * 1000  # Convert to milliseconds
         self.__processed_alerts = set()  # Keep track of processed alert IDs
         self.__processed_event_line_types = set()  # Track event ID + line type combinations
+        self.__processed_alerts_ids = set()  # Track alert IDs directly
         self.__running = False
         self.__monitor_thread = None
         
@@ -144,9 +145,15 @@ class OddsEngine:
         # Get alert identifiers
         alert_id = alert.get("eventId", "")
         line_type = alert.get("lineType", "")
+        alert_direct_id = alert.get("id", "")  # Get the direct alert ID
         
         # Create a unique key for this event + line type combination
         event_line_key = f"{alert_id}_{line_type}"
+        
+        # Skip if we've already processed this alert ID
+        if alert_direct_id and alert_direct_id in self.__processed_alerts_ids:
+            print(f"Skipping already processed alert ID: {alert_direct_id}")
+            return
         
         # Skip if we've already processed this event + line type combination
         if event_line_key in self.__processed_event_line_types:
@@ -160,6 +167,9 @@ class OddsEngine:
             print(f"Skipping corners market: {home_team} vs {away_team}")
             self.__processed_alerts.add(alert_id)
             self.__processed_event_line_types.add(event_line_key)
+            if alert_direct_id:
+                self.__processed_alerts_ids.add(alert_direct_id)
+                print(f"Added alert ID {alert_direct_id} to processed_alerts_ids")
             self.__last_processed_timestamp = max(self.__last_processed_timestamp, int(alert.get("timestamp", 0)))
             
             # Limit the size of processed alerts set to prevent memory growth
@@ -169,6 +179,10 @@ class OddsEngine:
             # Also limit the event + line type combinations set
             if len(self.__processed_event_line_types) > 2000:
                 self.__processed_event_line_types = set(list(self.__processed_event_line_types)[-2000:])
+                
+            # Limit the size of processed alerts IDs set
+            if len(self.__processed_alerts_ids) > 3000:
+                self.__processed_alerts_ids = set(list(self.__processed_alerts_ids)[-3000:])
             return
         
         # Skip alerts for matches that have already started (with timezone awareness)
@@ -185,6 +199,9 @@ class OddsEngine:
             print(f"Match start time (GMT): {match_start_datetime}, Current time (GMT): {current_datetime}")
             self.__processed_alerts.add(alert_id)
             self.__processed_event_line_types.add(event_line_key)
+            if alert_direct_id:
+                self.__processed_alerts_ids.add(alert_direct_id)
+                print(f"Added alert ID {alert_direct_id} to processed_alerts_ids")
             self.__last_processed_timestamp = max(self.__last_processed_timestamp, int(alert.get("timestamp", 0)))
             
             # Limit the size of processed alerts set to prevent memory growth
@@ -194,6 +211,10 @@ class OddsEngine:
             # Also limit the event + line type combinations set
             if len(self.__processed_event_line_types) > 2000:
                 self.__processed_event_line_types = set(list(self.__processed_event_line_types)[-2000:])
+                
+            # Limit the size of processed alerts IDs set
+            if len(self.__processed_alerts_ids) > 3000:
+                self.__processed_alerts_ids = set(list(self.__processed_alerts_ids)[-3000:])
             return
             
         # Shape the data for the bet engine
@@ -219,6 +240,12 @@ class OddsEngine:
                 if len(self.__processed_event_line_types) > 2000:
                     self.__processed_event_line_types = set(list(self.__processed_event_line_types)[-2000:])
             else:
+                if alert_direct_id:
+                    self.__processed_alerts_ids.add(alert_direct_id)
+                    print(f"Added alert ID {alert_direct_id} to processed_alerts_ids")
+                 # Limit the size of processed alerts IDs set
+                if len(self.__processed_alerts_ids) > 3000:
+                    self.__processed_alerts_ids = set(list(self.__processed_alerts_ids)[-3000:])
                 print(f"Bet was not successfully processed, not adding to processed collections")
         else:
             print(f"Invalid shaped data for alert, not adding to processed collections")
