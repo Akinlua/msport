@@ -112,6 +112,11 @@ class OddsEngine:
             
             # Process each alert
             for alert in data["data"]:
+                # Log alert timestamp
+                alert_timestamp = int(alert.get("timestamp", 0))
+                alert_time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(alert_timestamp/1000))
+                print(f"Processing alert with timestamp: {alert_time_str}")
+                
                 self.__process_alert(alert)
                 
         except Exception as e:
@@ -124,7 +129,19 @@ class OddsEngine:
         Parameters:
         - alert: The alert data from Pinnacle
         """
-        # Skip if we've already processed this alert
+        # Check if the alert timestamp is less than a minute ago
+        alert_timestamp = int(alert.get("timestamp", 0))
+        current_time = int(time.time() * 1000)  # Current time in milliseconds
+        time_diff_ms = current_time - alert_timestamp
+        
+        # If alert is less than a minute old, wait until it's a minute old
+        if time_diff_ms < 60000:  # 60000 ms = 1 minute
+            wait_time_seconds = (60000 - time_diff_ms) / 1000
+            print(f"Alert is only {time_diff_ms/1000:.1f} seconds old. Waiting {wait_time_seconds:.1f} seconds before processing.")
+            time.sleep(wait_time_seconds)
+            print("Resuming alert processing after wait period.")
+        
+        # Get alert identifiers
         alert_id = alert.get("eventId", "")
         line_type = alert.get("lineType", "")
         
@@ -163,20 +180,26 @@ class OddsEngine:
         # Send to bet engine if valid
         if shaped_data:
             print(f"Sending alert to bet engine: {shaped_data['game']['home']} vs {shaped_data['game']['away']} - {shaped_data['category']['type']}")
-            self.__notify_bet_engine(shaped_data)
+            bet_processed = self.__notify_bet_engine(shaped_data)
             
-        # Update tracking
-        self.__processed_alerts.add(alert_id)
-        self.__processed_event_line_types.add(event_line_key)
-        self.__last_processed_timestamp = max(self.__last_processed_timestamp, int(alert.get("timestamp", 0)))
-        
-        # Limit the size of processed alerts set to prevent memory growth
-        if len(self.__processed_alerts) > 1000:
-            self.__processed_alerts = set(list(self.__processed_alerts)[-1000:])
-            
-        # Also limit the event + line type combinations set
-        if len(self.__processed_event_line_types) > 2000:
-            self.__processed_event_line_types = set(list(self.__processed_event_line_types)[-2000:])
+            # Only add to processed collections if bet was successfully processed
+            if bet_processed:
+                print(f"Bet was successfully processed, adding to processed collections")
+                self.__processed_alerts.add(alert_id)
+                self.__processed_event_line_types.add(event_line_key)
+                self.__last_processed_timestamp = max(self.__last_processed_timestamp, int(alert.get("timestamp", 0)))
+                
+                # Limit the size of processed alerts set to prevent memory growth
+                if len(self.__processed_alerts) > 1000:
+                    self.__processed_alerts = set(list(self.__processed_alerts)[-1000:])
+                    
+                # Also limit the event + line type combinations set
+                if len(self.__processed_event_line_types) > 2000:
+                    self.__processed_event_line_types = set(list(self.__processed_event_line_types)[-2000:])
+            else:
+                print(f"Bet was not successfully processed, not adding to processed collections")
+        else:
+            print(f"Invalid shaped data for alert, not adding to processed collections")
     
     def __shape_alert_data(self, alert):
         """
@@ -194,6 +217,9 @@ class OddsEngine:
             print(f"Alert missing required fields: {alert}")
             return None
             
+        # Get sport id (1 for soccer, 3 for basketball)
+        sport_id = alert.get("sportId", 1)  # Default to soccer if not specified
+        
         shaped_data = {
             "game": {
                 "home": alert.get("home", ""),
@@ -210,7 +236,8 @@ class OddsEngine:
             "match_type": alert.get("type", ""),
             "periodNumber": alert.get("periodNumber", "0"),  # Default to main match
             "eventId": alert.get("eventId"),  # Include the event ID for fetching latest odds
-            "starts": alert.get("starts")  # Include the start time for better search matching
+            "starts": alert.get("starts"),  # Include the start time for better search matching
+            "sportId": sport_id  # Add sportId (1 for soccer, 3 for basketball)
         }
         
         # Add the appropriate prices based on line type
@@ -258,11 +285,17 @@ class OddsEngine:
         
         Parameters:
         - shaped_data: The shaped alert data
+        
+        Returns:
+        - Boolean indicating if the bet was successfully processed and placed
         """
         try:
-            self.bet_engine.notify(shaped_data)
+            # The bet_engine.notify method returns True if a bet was placed (EV > min_EV)
+            result = self.bet_engine.notify(shaped_data)
+            return result if result is not None else False
         except Exception as e:
             print(f"Error notifying bet engine: {e}")
+            return False
 
 if __name__ == "__main__":
     """Test the OddsEngine independently"""

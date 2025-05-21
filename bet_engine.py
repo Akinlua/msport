@@ -731,7 +731,7 @@ class BetEngine(WebsiteOpener):
         self.__bet_queue.put(bet_data)
         return True  # Return True as the bet was queued successfully
 
-    def __find_market_bet_code_with_points(self, event_details, line_type, points, outcome, is_first_half=False):
+    def __find_market_bet_code_with_points(self, event_details, line_type, points, outcome, is_first_half=False, sport_id=1):
         """
         Find the appropriate bet code in the Bet9ja event details and return the adjusted points value
         
@@ -741,11 +741,12 @@ class BetEngine(WebsiteOpener):
         - points: The points value for the bet
         - outcome: The outcome (home, away, draw, over, under)
         - is_first_half: Whether the bet is for the first half
+        - sport_id: The sport ID (1 for soccer, 3 for basketball)
         
         Returns:
         - Tuple of (bet_code, odds, adjusted_points)
         """
-        print(f"Finding market for: {line_type} - {outcome} - {points} - First Half: {is_first_half}")
+        print(f"Finding market for: {line_type} - {outcome} - {points} - First Half: {is_first_half} - Sport: {'Basketball' if sport_id == 3 else 'Soccer'}")
         
         if "O" not in event_details:
             print("No market odds found in event details")
@@ -753,22 +754,41 @@ class BetEngine(WebsiteOpener):
         
         odds_data = event_details["O"]
         
+        # Use different market prefixes based on sport
+        is_basketball = (sport_id == 3)
+        
         # Handle MONEYLINE bets (1X2 in Bet9ja)
         if line_type.lower() == "money_line":
             # Moneyline doesn't have points, so we'll use None
             adjusted_points = None
             
-            # Map outcome to Bet9ja format
-            outcome_map = {"home": "1", "away": "2", "draw": "X"}
-            if outcome.lower() not in outcome_map:
-                print(f"Invalid outcome for moneyline: {outcome}")
-                return None, None, adjusted_points
+            if is_basketball:
+                # Basketball uses different market codes (B_12 or B_1X21T for first half)
+                # Map outcome to Bet9ja format
+                outcome_map = {"home": "1", "away": "2"}
+                if outcome.lower() not in outcome_map:
+                    print(f"Invalid outcome for basketball moneyline: {outcome}")
+                    return None, None, adjusted_points
+                    
+                bet_outcome = outcome_map[outcome.lower()]
                 
-            bet_outcome = outcome_map[outcome.lower()]
-            
-            # Format: S_1X21T_1 for first half
-            market_prefix = "S_1X21T_" if is_first_half else "S_1X2_"
-            market_key = f"{market_prefix}{bet_outcome}"
+                # Format: B_1X21T_1HT for first half, B_12_1 for full match
+                market_prefix = "B_1X21T_" if is_first_half else "B_12_"
+                market_suffix = "HT" if is_first_half else ""
+                market_key = f"{market_prefix}{bet_outcome}{market_suffix}"
+            else:
+                # Soccer uses standard S_1X2 format
+                # Map outcome to Bet9ja format
+                outcome_map = {"home": "1", "away": "2", "draw": "X"}
+                if outcome.lower() not in outcome_map:
+                    print(f"Invalid outcome for soccer moneyline: {outcome}")
+                    return None, None, adjusted_points
+                    
+                bet_outcome = outcome_map[outcome.lower()]
+                
+                # Format: S_1X21T_1 for first half
+                market_prefix = "S_1X21T_" if is_first_half else "S_1X2_"
+                market_key = f"{market_prefix}{bet_outcome}"
             
             # Look for exact match instead of endswith
             for key, odds in odds_data.items():
@@ -791,7 +811,13 @@ class BetEngine(WebsiteOpener):
             bet_outcome = outcome_map[outcome.lower()]
             
             # First try exact match with original points
-            market_prefix = "S_OU1T@" if is_first_half else "S_OU@"
+            if is_basketball:
+                # Basketball format: B_1HOU@82.5_O for first half, B_OUN@164.5_O for full match
+                market_prefix = "B_1HOU@" if is_first_half else "B_OUN@"
+            else:
+                # Soccer format: S_OU1T@0.5_O for first half, S_OU@0.5_O for full match
+                market_prefix = "S_OU1T@" if is_first_half else "S_OU@"
+                
             exact_key = f"{market_prefix}{points}_{bet_outcome}"
             
             for key, odds in odds_data.items():
@@ -867,8 +893,13 @@ class BetEngine(WebsiteOpener):
                     
                 bet_outcome = outcome_map[outcome.lower()]
                 
-                # Format: S_DNB1T_1 for first half, S_DNB_1 for full match
-                market_prefix = "S_DNB1T_" if is_first_half else "S_DNB_"
+                if is_basketball:
+                    # Basketball doesn't typically have DNB market, so try handicap at 0
+                    market_prefix = "B_1HH@0_" if is_first_half else "B_H@0_"
+                else:
+                    # Soccer DNB format: S_DNB1T_1 for first half, S_DNB_1 for full match
+                    market_prefix = "S_DNB1T_" if is_first_half else "S_DNB_"
+                    
                 dnb_key = f"{market_prefix}{bet_outcome}"
                 
                 # Look for exact match
@@ -882,9 +913,9 @@ class BetEngine(WebsiteOpener):
                 
             # Adjust the points for away team (Bet9ja uses S_AH@X_Y format)
             handicap_points = points
-            if outcome.lower() == "away":
-                # Bet9ja represents away handicaps with negative of the original value
-                handicap_points = -float(points)
+            # if outcome.lower() == "away":
+            #     # Bet9ja represents away handicaps with negative of the original value
+            #     handicap_points = -float(points)
             
             # Map outcome to Bet9ja format for Asian Handicap
             outcome_map = {"home": "1", "away": "2"}
@@ -894,8 +925,13 @@ class BetEngine(WebsiteOpener):
                 
             bet_outcome = outcome_map[outcome.lower()]
             
-            # Format: S_AH1T@X_Y for first half, S_AH@X_Y for full match
-            market_prefix = "S_AH1T@" if is_first_half else "S_AH@"
+            if is_basketball:
+                # Basketball format: B_1HH@-14.5_1 for first half, B_H@-26.5_1 for full match
+                market_prefix = "B_1HH@" if is_first_half else "B_H@"
+            else:
+                # Soccer format: S_AH1T@X_Y for first half, S_AH@X_Y for full match
+                market_prefix = "S_AH1T@" if is_first_half else "S_AH@"
+                
             exact_key = f"{market_prefix}{handicap_points}_{bet_outcome}"
             
             # Look for exact match first
@@ -1311,6 +1347,9 @@ class BetEngine(WebsiteOpener):
             outcome = shaped_data["category"]["meta"]["team"]
             original_points = shaped_data["category"]["meta"].get("value")
             
+            # Get sport ID (1 for soccer, 3 for basketball)
+            sport_id = shaped_data.get("sportId", 1)  # Default to soccer if not specified
+            
             # Get start time if available
             pinnacle_start_time = shaped_data.get("starts")
             if pinnacle_start_time:
@@ -1342,7 +1381,8 @@ class BetEngine(WebsiteOpener):
                 line_type, 
                 original_points, 
                 outcome, 
-                is_first_half
+                is_first_half,
+                sport_id
             )
             
             if not bet_code or not bet_odds:
@@ -1380,7 +1420,7 @@ class BetEngine(WebsiteOpener):
             self.cleanup()
             raise
 
-    def __find_market_bet_code(self, event_details, line_type, points, outcome, is_first_half=False):
+    def __find_market_bet_code(self, event_details, line_type, points, outcome, is_first_half=False, sport_id=1):
         """
         DEPRECATED: Use __find_market_bet_code_with_points instead
         This method is kept for backward compatibility.
@@ -1393,13 +1433,14 @@ class BetEngine(WebsiteOpener):
         - points: The points value for the bet
         - outcome: The outcome (home, away, draw, over, under)
         - is_first_half: Whether the bet is for the first half
+        - sport_id: The sport ID (1 for soccer, 3 for basketball)
         
         Returns:
         - Tuple of (bet_code, odds)
         """
         # Forward to the new method and discard the adjusted points
         bet_code, odds, _ = self.__find_market_bet_code_with_points(
-            event_details, line_type, points, outcome, is_first_half
+            event_details, line_type, points, outcome, is_first_half, sport_id
         )
         return bet_code, odds
 
