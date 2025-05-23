@@ -455,7 +455,7 @@ class BetEngine(WebsiteOpener):
                                         # - Within 6 hours: +1 point
                                         # - Same day: +0.5 points
                                         # Check if time difference is within 5 minutes (0.0833 hours)
-                                        if time_diff_hours <= 0.0833:
+                                        if time_diff_hours <= 1.0833:  # 1 hour and 5 minutes
                                             time_match_score = 10  # High score for very close time match
                                         else:
                                             print(f"Time difference: {time_diff_hours:.2f} hours, not the right game because of difference in time" )
