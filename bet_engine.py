@@ -321,9 +321,9 @@ class BetEngine(WebsiteOpener):
         
         # Try different search strategies
         search_strategies = [
-            f"{home_team} {away_team}",  # Full match name
-            home_team,                   # Home team only
-            away_team,                   # Away team only
+            f"{home_team.lower()} {away_team.lower()}",  # Full match name
+            home_team.lower(),                   # Home team only
+            away_team.lower(),                   # Away team only
         ]
         
         # Add individual words from team names as search strategies
@@ -386,6 +386,7 @@ class BetEngine(WebsiteOpener):
                 search_results = response.json()
                 
                 if search_results["R"] == "OK" and search_results["D"]["numFound"] > 0:
+                    # print(f"search results: {search_results}")
                     # Check each sport for events
                     for sport_id, sport_data in search_results["D"]["S"].items():
                         if "E" in sport_data:
@@ -404,18 +405,22 @@ class BetEngine(WebsiteOpener):
                                         break
                                 
                                 if should_skip:
+                                    print(f"Skipping variant team: {event['DS']}")
                                     continue
                                 
                                 # Start with a base match score
                                 match_score = 0
+                                print(f"event name: {event_name}")
                                 
                                 # Calculate match score based on word matching
-                                home_words = set(word.lower() for word in home_team.split() if len(word) > 2)
-                                away_words = set(word.lower() for word in away_team.split() if len(word) > 2)
-                                event_words = set(word.lower() for word in event_name.split() if len(word) > 2)
+                                home_words = set(word.lower() for word in home_team.lower().split() if len(word) > 2)
+                                away_words = set(word.lower() for word in away_team.lower().split() if len(word) > 2)
+                                event_words = set(word.lower() for word in event_name.lower().split() if len(word) > 2)
                                 
                                 home_match_count = len(home_words.intersection(event_words))
                                 away_match_count = len(away_words.intersection(event_words))
+                                print(f"home match count: {home_match_count}")
+                                print(f"away match count: {away_match_count}")
                                 
                                 # Basic check if both team names are in the event - perfect match
                                 if (home_team.lower() in event_name and away_team.lower() in event_name):
@@ -449,14 +454,11 @@ class BetEngine(WebsiteOpener):
                                         # - Within 2 hours: +3 points
                                         # - Within 6 hours: +1 point
                                         # - Same day: +0.5 points
-                                        if time_diff_hours <= 0.5:
-                                            time_match_score = 5
-                                        elif time_diff_hours <= 2:
-                                            time_match_score = 3
-                                        elif time_diff_hours <= 6:
-                                            time_match_score = 1
-                                        elif time_diff_hours <= 24:
-                                            time_match_score = 0.5
+                                        # Check if time difference is within 5 minutes (0.0833 hours)
+                                        if time_diff_hours <= 0.0833:
+                                            time_match_score = 10  # High score for very close time match
+                                        else:
+                                            time_match_score = 0  # No score if times don't match closely
                                             
                                         match_score += time_match_score
                                         # print(f"Time match score: +{time_match_score}")
@@ -757,6 +759,7 @@ class BetEngine(WebsiteOpener):
         
         # Use different market prefixes based on sport
         is_basketball = (sport_id == "3" or sport_id == 3)
+        print(f"is basketball: {is_basketball}")
         
         # Handle MONEYLINE bets (1X2 in Bet9ja)
         if line_type.lower() == "money_line":

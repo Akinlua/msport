@@ -89,7 +89,7 @@ class OddsEngine:
         """
         current_time = int(time.time() * 1000)
         # Look back 10 minutes for alerts
-        lookback_time = current_time - (60 * 10 * 1000)
+        lookback_time = current_time - (60 * 2 * 1000)
         # lookback_time = 1747423479000
 
         print(f"Looking back {lookback_time} milliseconds")
@@ -246,7 +246,18 @@ class OddsEngine:
                  # Limit the size of processed alerts IDs set
                 if len(self.__processed_alerts_ids) > 3000:
                     self.__processed_alerts_ids = set(list(self.__processed_alerts_ids)[-3000:])
-                print(f"Bet was not successfully processed, not adding to processed collections")
+                self.__processed_alerts.add(alert_id)
+                self.__processed_event_line_types.add(event_line_key)
+                self.__last_processed_timestamp = max(self.__last_processed_timestamp, int(alert.get("timestamp", 0)))
+                
+                # Limit the size of processed alerts set to prevent memory growth
+                if len(self.__processed_alerts) > 1000:
+                    self.__processed_alerts = set(list(self.__processed_alerts)[-1000:])
+                    
+                # Also limit the event + line type combinations set
+                if len(self.__processed_event_line_types) > 2000:
+                    self.__processed_event_line_types = set(list(self.__processed_event_line_types)[-2000:])
+                print(f"Bet was not successfully processed, still adding to processed collections")
         else:
             print(f"Invalid shaped data for alert, not adding to processed collections")
     
