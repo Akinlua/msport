@@ -458,6 +458,7 @@ class BetEngine(WebsiteOpener):
                                         if time_diff_hours <= 0.0833:
                                             time_match_score = 10  # High score for very close time match
                                         else:
+                                            print(f"Time difference: {time_diff_hours:.2f} hours, not the right game because of difference in time" )
                                             time_match_score = 0  # No score if times don't match closely
                                             
                                         match_score += time_match_score
