@@ -115,6 +115,13 @@ class BetEngine(WebsiteOpener):
             if "bet_settings" in self.__config and "min_ev" in self.__config["bet_settings"]:
                 self.__min_ev = float(self.__config["bet_settings"]["min_ev"])
                 
+            if "bet_settings" in self.__config and "min_stake" in self.__config["bet_settings"]:
+                self.__min_stake = float(self.__config["bet_settings"]["min_stake"])
+                
+            if "bet_settings" in self.__config and "max_stake" in self.__config["bet_settings"]:
+                self.__max_stake = float(self.__config["bet_settings"]["max_stake"])
+                
+                
             print(f"Loaded configuration from {config_file}")
         except Exception as e:
             print(f"Error loading config file: {e}")
@@ -127,7 +134,7 @@ class BetEngine(WebsiteOpener):
                     "min_ev": self.__min_ev,
                     "kelly_fraction": 0.3,
                     "min_stake": 10,
-                    "max_stake": 100,
+                    "max_stake": 1000000,
                     "bankroll": 1000
                 }
             }
@@ -1319,8 +1326,11 @@ class BetEngine(WebsiteOpener):
         fractional_kelly = full_kelly * 0.3
         
         # Apply min/max stake limits
-        min_stake = float(os.getenv("MIN_STAKE", "10"))
-        max_stake = float(os.getenv("MAX_STAKE", "100"))
+        # min_stake = float(os.getenv("MIN_STAKE", "10"))
+        # max_stake = float(os.getenv("MAX_STAKE", "100"))
+
+        min_stake = self.__min_stake
+        max_stake = self.__max_stake
         
         stake = max(min_stake, min(fractional_kelly, max_stake))
         

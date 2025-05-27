@@ -15,7 +15,7 @@
         "min_ev": 5.5,
         "kelly_fraction": 0.3,
         "min_stake": 10,
-        "max_stake": 100,
+        "max_stake": 100000,
         "bankroll": 1000
     }
-} 
+}
