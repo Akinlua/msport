@@ -572,7 +572,9 @@ class BetEngine(WebsiteOpener):
                 return False
             
             # Find an available account
+            print(f"Checking {len(self.__accounts)} accounts")
             for account in self.__accounts:
+                print(f"Checking account {account.username}")
                 if account.can_place_bet():
                     # Check if login is needed
                     if account.needs_login():
@@ -672,7 +674,7 @@ class BetEngine(WebsiteOpener):
         # Get proxies if configured
         proxies = account.get_proxies()
         if proxies:
-            print(f"Using proxy for bet placement: {account.proxy}")
+            print(f"Using proxy for bet placement: {account.proxy} {account.username}")
             # Check IP with proxy
             self.__check_ip_address(using_proxy=True, proxy_url=proxies)
         else:
@@ -1153,7 +1155,7 @@ class BetEngine(WebsiteOpener):
             url = f"{pinnacle_api_host}/events/{event_id}"
             print(f"Fetching latest odds from: {url}")
             
-            response = requests.get(url, proxies=proxies)
+            response = requests.get(url)
             if response.status_code != 200:
                 print(f"Failed to fetch latest odds: HTTP {response.status_code}")
                 return None
