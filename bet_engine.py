@@ -209,6 +209,7 @@ class BetEngine(WebsiteOpener):
         """Log in to Bet9ja website with the first account (for search functionality)"""
         if self.__accounts:
             self.__do_login_for_account(self.__accounts[0])
+            self.__do_login_for_account(self.__accounts[1])
         else:
             raise ValueError("No betting accounts configured")
             
