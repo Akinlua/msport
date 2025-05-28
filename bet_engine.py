@@ -213,7 +213,7 @@ class BetEngine(WebsiteOpener):
         else:
             raise ValueError("No betting accounts configured")
             
-    def __check_ip_address(self, using_proxy=False, proxy_url=None):
+    def __check_ip_address(self, using_proxy=False, proxy_url=None, account=None ):
         """Check and log the current IP address being used"""
         try:
             # Use a service that returns the client's IP address
@@ -224,7 +224,7 @@ class BetEngine(WebsiteOpener):
                 if "ip" in ip_data:
                     ip_address = ip_data["ip"]
                     if using_proxy:
-                        print(f"✅ Using proxy - Current IP address: {ip_address}")
+                        print(f"✅ Using proxy - Current IP address: {ip_address} {account.username} {account.proxy}")
                     else:
                         print(f"Current IP address (no proxy): {ip_address}")
                     return ip_address
@@ -257,12 +257,12 @@ class BetEngine(WebsiteOpener):
             # Get proxies if configured
             proxies = account.get_proxies()
             if proxies:
-                print(f"Using proxy for login: {account.proxy}")
+                print(f"Using proxy for login: {account.proxy} {account.username}")
                 # Check IP with proxy
-                self.__check_ip_address(using_proxy=True, proxy_url=proxies)
+                self.__check_ip_address(using_proxy=True, proxy_url=proxies, account=account)
             else:
                 # Check IP without proxy
-                self.__check_ip_address(using_proxy=False)
+                self.__check_ip_address(using_proxy=False, account=account)
             
             # Make the login request
             login_url = f"{self.__bet_host}/desktop/feapi/AuthAjax/Login?v_cache_version=1.276.0.187"
@@ -677,10 +677,10 @@ class BetEngine(WebsiteOpener):
         if proxies:
             print(f"Using proxy for bet placement: {account.proxy} {account.username}")
             # Check IP with proxy
-            self.__check_ip_address(using_proxy=True, proxy_url=proxies)
+            self.__check_ip_address(using_proxy=True, proxy_url=proxies, account=account)
         else:
             # Check IP without proxy
-            self.__check_ip_address(using_proxy=False)
+            self.__check_ip_address(using_proxy=False, account=account)
         
         try:
             response = requests.post(
