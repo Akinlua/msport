@@ -41,6 +41,8 @@ class BetAccount:
         self.current_bets = max(0, self.current_bets - 1)
         
     def can_place_bet(self):
+        print(f"Account {self.username} can place bet: {self.active} {self.cookie_jar is not None} {self.current_bets < self.max_concurrent_bets} {self.balance >= self.min_balance}")
+        print(f"current bets: {self.current_bets} max concurrent bets: {self.max_concurrent_bets} balance: {self.balance} min balance: {self.min_balance}")
         return (self.active and 
                 self.cookie_jar is not None and 
                 self.current_bets < self.max_concurrent_bets and
@@ -578,6 +580,7 @@ class BetEngine(WebsiteOpener):
             for account in self.__accounts:
                 print(f"Checking account {account.username}")
                 if account.can_place_bet():
+                    print(f"Account {account.username} can place bet")
                     # Check if login is needed
                     if account.needs_login():
                         try:
@@ -1418,6 +1421,20 @@ class BetEngine(WebsiteOpener):
             # Step 4: Calculate EV with the adjusted points
             print(f"Calculating EV with adjusted points: {adjusted_points}")
             ev = self.__calculate_ev(bet_odds, modified_shaped_data)
+            
+            # Check Pinnacle odds for the specific outcome before placing bet
+            decimal_prices = modified_shaped_data.get("_decimal_prices", {})
+            outcome_key = modified_shaped_data.get("_outcome_key", "")
+            
+            if decimal_prices and outcome_key:
+                pinnacle_odds = decimal_prices.get(outcome_key)
+                if pinnacle_odds and pinnacle_odds < 3.5:
+                    print(f"Pinnacle odds ({pinnacle_odds:.2f}) are below 3.5 threshold, not placing bet")
+                    return False
+                else:
+                    print(f"Pinnacle odds check passed: {pinnacle_odds:.2f} >= 3.5")
+            else:
+                print("Warning: Could not verify Pinnacle odds, proceeding with bet")
             
             # Step 5: Place bet if EV is positive and above threshold
             print(f"EV: {ev:.2f}%")
