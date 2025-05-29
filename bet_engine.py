@@ -182,7 +182,7 @@ class BetEngine(WebsiteOpener):
         # Login to the first account for search functionality
         if self.__accounts:
             self.__do_login_for_account(self.__accounts[0])
-            self.__do_login_for_account(self.__accounts[1])
+            # self.__do_login_for_account(self.__accounts[1])
 
             
     def __start_bet_worker(self):
