@@ -252,9 +252,21 @@ class BetEngine(WebsiteOpener):
             }
             
             headers = {
-                "User-Agent": "Mozilla/5.0",
-                "Accept": "application/json",
-                "Content-Type": "application/x-www-form-urlencoded"
+                "accept": "application/json, text/plain, */*",
+                "accept-encoding": "gzip, deflate, br, zstd",
+                "accept-language": "en-US,en;q=0.9",
+                "content-length": "36",
+                "content-type": "application/x-www-form-urlencoded",
+                "origin": "https://sports.bet9ja.com",
+                "priority": "u=1, i",
+                "referer": "https://sports.bet9ja.com/",
+                "sec-ch-ua": '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": '"macOS"',
+                "sec-fetch-dest": "empty",
+                "sec-fetch-mode": "cors", 
+                "sec-fetch-site": "same-origin",
+                "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
             }
             
             # Get proxies if configured
@@ -272,7 +284,7 @@ class BetEngine(WebsiteOpener):
                 self.__check_ip_address(using_proxy=False, account=account)
             
             # Make the login request
-            login_url = f"{self.__bet_host}/desktop/feapi/AuthAjax/Login?v_cache_version=1.276.0.187"
+            login_url = f"{self.__bet_host}/desktop/feapi/AuthAjax/Login?v_cache_version=1.279.0.197"
             login_response = requests.post(
                 login_url,
                 data=login_data,
