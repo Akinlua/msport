@@ -261,6 +261,10 @@ class BetEngine(WebsiteOpener):
             proxies = account.get_proxies()
             if proxies:
                 print(f"Using proxy for login: {account.proxy} {account.username}")
+                ip_check_url = "https://api.ipify.org?format=json"
+                response = requests.get(ip_check_url)
+                ip_data = response.json()
+                print(f"IP response: {ip_data['ip']}")
                 # Check IP with proxy
                 self.__check_ip_address(using_proxy=True, proxy_url=proxies, account=account)
             else:
