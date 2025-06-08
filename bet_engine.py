@@ -602,7 +602,7 @@ class BetEngine(WebsiteOpener):
                     if success:
                         account.decrement_bets()
                         # dedcue from balance
-                        account.balance -= stake
+                        # account.balance -= stake
                         print(f"Bet placed successfully with account {account.username}")
                         return True
                     else:
