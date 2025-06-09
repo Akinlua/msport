@@ -1313,6 +1313,47 @@ class BetEngine(WebsiteOpener):
             return 0  # no bet
         return bankroll * numerator / b
         
+    def __round_stake_humanlike(self, stake):
+        """
+        Round stake to more human-like amounts to avoid detection
+        
+        Parameters:
+        - stake: The calculated stake amount
+        
+        Returns:
+        - Rounded stake that looks more natural
+        """
+        if stake < 50:
+            # For small amounts, round to nearest 5 or 10
+            if stake < 20:
+                return round(stake / 5) * 5  # Round to nearest 5
+            else:
+                return round(stake / 10) * 10  # Round to nearest 10
+        
+        elif stake < 200:
+            # For medium amounts (50-200), round to nearest 10 or 25
+            if stake < 100:
+                return round(stake / 10) * 10  # Round to nearest 10
+            else:
+                return round(stake / 25) * 25  # Round to nearest 25
+        
+        elif stake < 1000:
+            # For larger amounts (200-1000), round to nearest 50
+            return round(stake / 50) * 50
+        
+        elif stake < 5000:
+            # For large amounts (1000-5000), round to nearest 100
+            # Examples: 1506 -> 1500, 2453 -> 2500
+            return round(stake / 100) * 100
+        
+        elif stake < 10000:
+            # For very large amounts (5000-10000), round to nearest 250
+            return round(stake / 250) * 250
+        
+        else:
+            # For extremely large amounts (10000+), round to nearest 500
+            return round(stake / 500) * 500
+
     def __calculate_stake(self, bet_odds, shaped_data, bankroll):
         """
         Calculate the stake amount based on Kelly criterion
@@ -1322,7 +1363,7 @@ class BetEngine(WebsiteOpener):
         - shaped_data: The data with prices and outcome information
         
         Returns:
-        - Recommended stake amount
+        - Recommended stake amount (rounded to human-like values)
         """
         # Get the stored decimal prices and outcome key
         decimal_prices = shaped_data.get("_decimal_prices", {})
@@ -1330,12 +1371,12 @@ class BetEngine(WebsiteOpener):
         
         if not decimal_prices or not outcome_key:
             print("Missing required data for stake calculation")
-            return 10  # Default stake if calculation not possible
+            return self.__round_stake_humanlike(10)  # Default stake if calculation not possible
         
         # Extract values into a list for power method
         odds_values = list(decimal_prices.values())
         if not odds_values:
-            return 10  # Default stake
+            return self.__round_stake_humanlike(10)  # Default stake
         
         # Calculate fair probabilities using power method
         fair_probs = self.__power_method_devig(odds_values)
@@ -1349,7 +1390,7 @@ class BetEngine(WebsiteOpener):
         # Get the probability for our specific outcome
         if outcome_key not in outcome_probs:
             print(f"Outcome {outcome_key} not found in probabilities")
-            return 10  # Default stake
+            return self.__round_stake_humanlike(10)  # Default stake
             
         outcome_prob = outcome_probs[outcome_key]
         
@@ -1369,10 +1410,14 @@ class BetEngine(WebsiteOpener):
         
         stake = max(min_stake, min(fractional_kelly, max_stake))
         
-        print(f"Probability: {outcome_prob:.4f}, Full Kelly: {full_kelly:.2f}, "
-              f"Fractional Kelly (30%): {fractional_kelly:.2f}, Final Stake: {stake:.2f}")
+        # Round to human-like amounts
+        rounded_stake = self.__round_stake_humanlike(stake)
         
-        return stake
+        print(f"Probability: {outcome_prob:.4f}, Full Kelly: {full_kelly:.2f}, "
+              f"Fractional Kelly (30%): {fractional_kelly:.2f}, Calculated Stake: {stake:.2f}, "
+              f"Rounded Stake: {rounded_stake:.2f}")
+        
+        return rounded_stake
 
     def notify(self, shaped_data):
         """
