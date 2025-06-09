@@ -1444,11 +1444,11 @@ class BetEngine(WebsiteOpener):
             
             if decimal_prices and outcome_key:
                 pinnacle_odds = decimal_prices.get(outcome_key)
-                if pinnacle_odds and pinnacle_odds < 3.5:
-                    print(f"Pinnacle odds ({pinnacle_odds:.2f}) are below 3.5 threshold, not placing bet")
+                if pinnacle_odds and pinnacle_odds > 3.5:
+                    print(f"Pinnacle odds ({pinnacle_odds:.2f}) are above 3.5 threshold, not placing bet")
                     return False
                 else:
-                    print(f"Pinnacle odds check passed: {pinnacle_odds:.2f} >= 3.5")
+                    print(f"Pinnacle odds check passed: {pinnacle_odds:.2f} <= 3.5")
             else:
                 print("Warning: Could not verify Pinnacle odds, proceeding with bet")
             
