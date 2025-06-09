@@ -181,8 +181,8 @@ class BetEngine(WebsiteOpener):
         
         # Login to the first account for search functionality
         if self.__accounts:
-            self.__do_login_for_account(self.__accounts[0])
-            # self.__do_login_for_account(self.__accounts[1])
+            for account in self.__accounts:
+                self.__do_login_for_account(account)
 
             
     def __start_bet_worker(self):
@@ -569,13 +569,13 @@ class BetEngine(WebsiteOpener):
 
     def __place_bet_with_available_account(self, bet_data):
         """
-        Place a bet using an available account
+        Place a bet using all available accounts
         
         Parameters:
         - bet_data: Dictionary with bet information
         
         Returns:
-        - True if bet was placed successfully, False otherwise
+        - True if at least one bet was placed successfully, False otherwise
         """
         try:
             # Get max concurrent bets from config
@@ -591,8 +591,15 @@ class BetEngine(WebsiteOpener):
                 threading.Timer(30.0, lambda: self.__bet_queue.put(bet_data)).start()
                 return False
             
-            # Find an available account
+            # Track if at least one bet was placed successfully
+            any_bet_placed = False
+            
+            # Find all available accounts and place bets with each
             print(f"Checking {len(self.__accounts)} accounts")
+            print(f"account names: {[account.username for account in self.__accounts]}")
+
+            for account in self.__accounts:
+                print(f"just checking account {account.username}")
             for account in self.__accounts:
                 print(f"Checking account {account.username}")
                 if account.can_place_bet():
@@ -620,15 +627,20 @@ class BetEngine(WebsiteOpener):
                         # dedcue from balance
                         # account.balance -= stake
                         print(f"Bet placed successfully with account {account.username}")
-                        return True
+                        any_bet_placed = True
                     else:
                         # If bet failed, decrement the bet counter
                         account.decrement_bets()
+                else:
+                    print(f"Account {account.username} cannot place bet")
             
-            print("No available accounts to place bet. Queuing for retry.")
-            # Re-add to queue with a delay
-            threading.Timer(60.0, lambda: self.__bet_queue.put(bet_data)).start()
-            return False
+            if not any_bet_placed:
+                print("No available accounts to place bet. Queuing for retry.")
+                # Re-add to queue with a delay
+                threading.Timer(60.0, lambda: self.__bet_queue.put(bet_data)).start()
+                return False
+            
+            return any_bet_placed
         except Exception as e:
             print(f"Error in place_bet_with_available_account: {e}")
             # Close browser on error
