@@ -123,6 +123,30 @@ class BetEngine(WebsiteOpener):
             if "bet_settings" in self.__config and "max_stake" in self.__config["bet_settings"]:
                 self.__max_stake = float(self.__config["bet_settings"]["max_stake"])
                 
+            if "bet_settings" in self.__config and "max_pinnacle_odds" in self.__config["bet_settings"]:
+                self.__max_pinnacle_odds = float(self.__config["bet_settings"]["max_pinnacle_odds"])
+            else:
+                self.__max_pinnacle_odds = 3.0  # Default value
+                
+            # Load odds-based stake ranges
+            if "bet_settings" in self.__config and "odds_based_stakes" in self.__config["bet_settings"]:
+                self.__odds_based_stakes = self.__config["bet_settings"]["odds_based_stakes"]
+            else:
+                # Default odds-based stake ranges
+                self.__odds_based_stakes = {
+                    "low_odds": {
+                        "max_odds": 1.99,
+                        "min_stake": 6000,
+                        "max_stake": 12000
+                    },
+                    "medium_odds": {
+                        "min_odds": 2.0,
+                        "max_odds": 3.0,
+                        "min_stake": 3000,
+                        "max_stake": 7000
+                    }
+                }
+                
                 
             print(f"Loaded configuration from {config_file}")
         except Exception as e:
@@ -137,6 +161,20 @@ class BetEngine(WebsiteOpener):
                     "kelly_fraction": 0.3,
                     "min_stake": 10,
                     "max_stake": 1000000,
+                    "max_pinnacle_odds": 3.0,
+                    "odds_based_stakes": {
+                        "low_odds": {
+                            "max_odds": 1.99,
+                            "min_stake": 6000,
+                            "max_stake": 12000
+                        },
+                        "medium_odds": {
+                            "min_odds": 2.0,
+                            "max_odds": 3.0,
+                            "min_stake": 3000,
+                            "max_stake": 7000
+                        }
+                    },
                     "bankroll": 1000
                 }
             }
@@ -1354,6 +1392,32 @@ class BetEngine(WebsiteOpener):
             # For extremely large amounts (10000+), round to nearest 500
             return round(stake / 500) * 500
 
+    def __get_stake_limits_for_odds(self, odds):
+        """
+        Get the appropriate min and max stake limits based on odds
+        
+        Parameters:
+        - odds: The decimal odds for the bet
+        
+        Returns:
+        - Tuple of (min_stake, max_stake)
+        """
+        # Check if odds fall into any defined range
+        for range_name, range_config in self.__odds_based_stakes.items():
+            min_odds = range_config.get("min_odds", 0)
+            max_odds = range_config.get("max_odds", float('inf'))
+            
+            # Check if odds fall within this range
+            if min_odds <= odds <= max_odds:
+                min_stake = range_config.get("min_stake", self.__min_stake)
+                max_stake = range_config.get("max_stake", self.__max_stake)
+                print(f"Using {range_name} stake limits for odds {odds:.2f}: min={min_stake}, max={max_stake}")
+                return min_stake, max_stake
+        
+        # If no range matches, use default limits
+        print(f"Using default stake limits for odds {odds:.2f}: min={self.__min_stake}, max={self.__max_stake}")
+        return self.__min_stake, self.__max_stake
+
     def __calculate_stake(self, bet_odds, shaped_data, bankroll):
         """
         Calculate the stake amount based on Kelly criterion
@@ -1401,12 +1465,8 @@ class BetEngine(WebsiteOpener):
         # Use 30% of Kelly as a more conservative approach
         fractional_kelly = full_kelly * 0.3
         
-        # Apply min/max stake limits
-        # min_stake = float(os.getenv("MIN_STAKE", "10"))
-        # max_stake = float(os.getenv("MAX_STAKE", "100"))
-
-        min_stake = self.__min_stake
-        max_stake = self.__max_stake
+        # Get odds-based stake limits
+        min_stake, max_stake = self.__get_stake_limits_for_odds(bet_odds)
         
         stake = max(min_stake, min(fractional_kelly, max_stake))
         
@@ -1501,11 +1561,11 @@ class BetEngine(WebsiteOpener):
             
             if decimal_prices and outcome_key:
                 pinnacle_odds = decimal_prices.get(outcome_key)
-                if pinnacle_odds and pinnacle_odds > 3:
-                    print(f"Pinnacle odds ({pinnacle_odds:.2f}) are above 3 threshold, not placing bet")
+                if pinnacle_odds and pinnacle_odds > self.__max_pinnacle_odds:
+                    print(f"Pinnacle odds ({pinnacle_odds:.2f}) are above {self.__max_pinnacle_odds} threshold, not placing bet")
                     return False
                 else:
-                    print(f"Pinnacle odds check passed: {pinnacle_odds:.2f} <= 3")
+                    print(f"Pinnacle odds check passed: {pinnacle_odds:.2f} <= {self.__max_pinnacle_odds}")
             else:
                 print("Warning: Could not verify Pinnacle odds, proceeding with bet")
             

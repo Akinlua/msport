@@ -6,24 +6,47 @@
             "active": true,
             "max_concurrent_bets": 3,
             "min_balance": 100,
-            "proxy": "http://ng.decodo.com:42004"
+            "proxy": null
         },
         {
-            "username": "riricole",
-            "password": "Qwertyuiop1",
+            "username": "Zaipase",
+            "password": "Samuel1122#",
             "active": true,
             "max_concurrent_bets": 3,
             "min_balance": 100,
-            "proxy": "http://ng.decodo.com:42010"
+            "proxy": null
+        },
+        {
+            "username": "2349069948695",
+            "password": "philip3912",
+            "active": true,
+            "max_concurrent_bets": 3,
+            "min_balance": 100,
+            "proxy": null
         }
     ],
     "max_total_concurrent_bets": 5,
-    "use_proxies": true,
+    "use_proxies": false,
     "bet_settings": {
         "min_ev": 5.5,
         "kelly_fraction": 0.3,
         "min_stake": 1500,
-        "max_stake": 15000,
-        "bankroll": 1000
+        "max_stake": 10000,
+        "bankroll": 1000,
+        "max_pinnacle_odds": 3.0,
+        "odds_based_stakes": {
+            "low_odds": {
+                "max_odds": 1.99,
+                "min_odds": 0.0,
+                "min_stake": 6000,
+                "max_stake": 12000
+            },
+            "medium_odds": {
+                "min_odds": 2.0,
+                "max_odds": 3.0,
+                "min_stake": 3000,
+                "max_stake": 7000
+            }
+        }
     }
 }
