@@ -6,7 +6,7 @@
             "active": true,
             "max_concurrent_bets": 3,
             "min_balance": 100,
-            "proxy": null
+            "proxy": "http://ng.decodo.com:42000"
         },
         {
             "username": "Zaipase",
@@ -14,7 +14,7 @@
             "active": true,
             "max_concurrent_bets": 3,
             "min_balance": 100,
-            "proxy": null
+            "proxy": "http://ng.decodo.com:42003"
         },
         {
             "username": "2349069948695",
@@ -22,11 +22,11 @@
             "active": true,
             "max_concurrent_bets": 3,
             "min_balance": 100,
-            "proxy": null
+            "proxy": "http://ng.decodo.com:42002"
         }
     ],
     "max_total_concurrent_bets": 5,
-    "use_proxies": false,
+    "use_proxies": true,
     "bet_settings": {
         "min_ev": 5.5,
         "kelly_fraction": 0.3,
