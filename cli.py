@@ -45,7 +45,7 @@ def add_account(username: str, password: str) -> None:
         "username": username,
         "password": password,
         "active": True,
-        "max_concurrent_bets": 3,
+        "max_concurrent_bets": 20,
         "min_balance": 100,
         "proxy": None
     }

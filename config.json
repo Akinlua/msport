@@ -4,7 +4,7 @@
         "username": "Suleybawa",
         "password": "Spotify1",
         "active": true,
-        "max_concurrent_bets": 3,
+        "max_concurrent_bets": 20,
         "min_balance": 100,
         "proxy": "http://ng.decodo.com:42000"
       },
@@ -12,7 +12,7 @@
         "username": "Zaipase",
         "password": "Samuel1122#",
         "active": true,
-        "max_concurrent_bets": 3,
+        "max_concurrent_bets": 20,
         "min_balance": 100,
         "proxy": "http://ng.decodo.com:42003"
       },
@@ -20,12 +20,12 @@
         "username": "2349069948695",
         "password": "philip3912",
         "active": true,
-        "max_concurrent_bets": 3,
+        "max_concurrent_bets": 20,
         "min_balance": 100,
         "proxy": "http://ng.decodo.com:42002"
       }
     ],
-    "max_total_concurrent_bets": 5,
+    "max_total_concurrent_bets": 20,
     "use_proxies": true,
     "bet_settings": {
       "min_ev": 5.5,
