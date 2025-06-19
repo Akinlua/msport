@@ -1,6 +1,6 @@
 import requests
 url = 'https://ip.decodo.com/json'
-proxy = f"http://ng.decodo.com:42000"
+proxy = "http://156.242.43.44:3129"
 
 result = requests.get(url, proxies = {
     'http': proxy,
