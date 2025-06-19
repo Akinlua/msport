@@ -1558,16 +1558,20 @@ class BetEngine(WebsiteOpener):
             # Check Pinnacle odds for the specific outcome before placing bet
             decimal_prices = modified_shaped_data.get("_decimal_prices", {})
             outcome_key = modified_shaped_data.get("_outcome_key", "")
-            
-            if decimal_prices and outcome_key:
-                pinnacle_odds = decimal_prices.get(outcome_key)
-                if pinnacle_odds and pinnacle_odds > self.__max_pinnacle_odds:
-                    print(f"Pinnacle odds ({pinnacle_odds:.2f}) are above {self.__max_pinnacle_odds} threshold, not placing bet")
-                    return False
-                else:
-                    print(f"Pinnacle odds check passed: {pinnacle_odds:.2f} <= {self.__max_pinnacle_odds}")
-            else:
-                print("Warning: Could not verify Pinnacle odds, proceeding with bet")
+            if bet_odds > self.__max_pinnacle_odds:
+                print(f"Pinnacle odds ({bet_odds:.2f}) are above {self.__max_pinnacle_odds} threshold, not placing bet")
+                return False
+            else: 
+                print(f"Pinnacle odds check passed: {bet_odds:.2f} <= {self.__max_pinnacle_odds}")
+            # if decimal_prices and outcome_key:
+            #     pinnacle_odds = decimal_prices.get(outcome_key)
+            #     if pinnacle_odds and pinnacle_odds > self.__max_pinnacle_odds:
+            #         print(f"Pinnacle odds ({pinnacle_odds:.2f}) are above {self.__max_pinnacle_odds} threshold, not placing bet")
+            #         return False
+            #     else:
+            #         print(f"Pinnacle odds check passed: {pinnacle_odds:.2f} <= {self.__max_pinnacle_odds}")
+            # else:
+            #     print("Warning: Could not verify Pinnacle odds, proceeding with bet")
             
             # Step 5: Place bet if EV is positive and above threshold
             print(f"EV: {ev:.2f}%")
