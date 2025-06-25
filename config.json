@@ -6,7 +6,7 @@
             "active": true,
             "max_concurrent_bets": 20,
             "min_balance": 100,
-            "proxy": "http://156.242.43.44:3129"
+            "proxy": "http://156.228.90.117:3129"
         },
         {
             "username": "2349069948695",
@@ -14,7 +14,7 @@
             "active": true,
             "max_concurrent_bets": 20,
             "min_balance": 100,
-            "proxy": "http://156.228.171.227:3129"
+            "proxy": "http://156.233.88.27:3129"
         },
         {
             "username": "2349021096912",
