@@ -1,52 +1,52 @@
 {
-  "accounts": [
-    {
-      "username": "Suleybawa",
-      "password": "Spotify1",
-      "active": true,
-      "max_concurrent_bets": 20,
-      "min_balance": 100,
-      "proxy": "http://156.253.175.89:3129"
-    },
-    {
-      "username": "Zaipase",
-      "password": "Samuel1122#",
-      "active": true,
-      "max_concurrent_bets": 20,
-      "min_balance": 100,
-      "proxy": "http://156.242.43.44:3129"
-    },
-    {
-      "username": "2349069948695",
-      "password": "philip3912",
-      "active": true,
-      "max_concurrent_bets": 20,
-      "min_balance": 100,
-      "proxy": "http://156.228.171.227:3129"
+    "accounts": [
+        {
+            "username": "Zaipase",
+            "password": "Samuel1122#",
+            "active": true,
+            "max_concurrent_bets": 20,
+            "min_balance": 100,
+            "proxy": "http://156.242.43.44:3129"
+        },
+        {
+            "username": "2349069948695",
+            "password": "philip3912",
+            "active": true,
+            "max_concurrent_bets": 20,
+            "min_balance": 100,
+            "proxy": "http://156.228.171.227:3129"
+        },
+        {
+            "username": "2349021096912",
+            "password": "X0X01199.",
+            "active": true,
+            "max_concurrent_bets": 20,
+            "min_balance": 100,
+            "proxy": null
+        }
+    ],
+    "max_total_concurrent_bets": 20,
+    "use_proxies": true,
+    "bet_settings": {
+        "min_ev": 5.5,
+        "kelly_fraction": 0.3,
+        "min_stake": 1500,
+        "max_stake": 10000,
+        "bankroll": 1000,
+        "max_pinnacle_odds": 3.0,
+        "odds_based_stakes": {
+            "low_odds": {
+                "max_odds": 1.99,
+                "min_odds": 0.0,
+                "min_stake": 6000,
+                "max_stake": 12000
+            },
+            "medium_odds": {
+                "min_odds": 2.0,
+                "max_odds": 3.0,
+                "min_stake": 3000,
+                "max_stake": 7000
+            }
+        }
     }
-  ],
-  "max_total_concurrent_bets": 20,
-  "use_proxies": true,
-  "bet_settings": {
-    "min_ev": 5.5,
-    "kelly_fraction": 0.3,
-    "min_stake": 1500,
-    "max_stake": 10000,
-    "bankroll": 1000,
-    "max_pinnacle_odds": 3.0,
-    "odds_based_stakes": {
-      "low_odds": {
-        "max_odds": 1.99,
-        "min_odds": 0.0,
-        "min_stake": 6000,
-        "max_stake": 12000
-      },
-      "medium_odds": {
-        "min_odds": 2.0,
-        "max_odds": 3.0,
-        "min_stake": 3000,
-        "max_stake": 7000
-      }
-    }
-  }
 }
