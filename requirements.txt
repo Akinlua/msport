@@ -4,3 +4,4 @@ python-dotenv==1.0.0
 webdriver-manager==4.0.0
 scipy
 selenium_driverless
+nest_asyncio
