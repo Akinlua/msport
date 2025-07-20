@@ -451,6 +451,15 @@ class BetEngine(WebsiteOpener):
             
             # Wait for login to complete (increased timeout for headless)
             time.sleep(8)
+
+            # Take screenshot of error state
+            try:
+                timestamp = time.strftime("%Y%m%d-%H%M%S")
+                screenshot_path = f"logindone_{timestamp}.png"
+                self.driver.save_screenshot(screenshot_path)
+                print(f"Error screenshot saved to {screenshot_path}")
+            except Exception as screenshot_error:
+                print(f"Failed to take error screenshot: {screenshot_error}")
             
             # Check if login was successful by looking for user profile or betting interface
             try:
@@ -743,6 +752,14 @@ class BetEngine(WebsiteOpener):
             
             # Always login before placing bet
             print("Logging in before placing bet...")
+            # Take screenshot of error state
+            try:
+                timestamp = time.strftime("%Y%m%d-%H%M%S")
+                screenshot_path = f"login1_{timestamp}.png"
+                self.driver.save_screenshot(screenshot_path)
+                print(f"Error screenshot saved to {screenshot_path}")
+            except Exception as screenshot_error:
+                print(f"Failed to take error screenshot: {screenshot_error}")
             login_success = self.__do_login_for_account(account)
             if not login_success:
                 print("Login failed, cannot place bet")
@@ -1027,6 +1044,14 @@ class BetEngine(WebsiteOpener):
                 return False
                 
         except Exception as e:
+            # Take screenshot of error state
+            try:
+                timestamp = time.strftime("%Y%m%d-%H%M%S")
+                screenshot_path = f"error_screenshot_{timestamp}.png"
+                self.driver.save_screenshot(screenshot_path)
+                print(f"Error screenshot saved to {screenshot_path}")
+            except Exception as screenshot_error:
+                print(f"Failed to take error screenshot: {screenshot_error}")
             print(f"Error placing bet with Selenium: {e}")
             import traceback
             traceback.print_exc()
