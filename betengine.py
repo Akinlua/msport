@@ -363,39 +363,99 @@ class BetEngine(WebsiteOpener):
             # Navigate to MSport login page
             login_url = f"{self.__bet_host}"
             self.driver.get(login_url)
-            time.sleep(2)
+            time.sleep(3)  # Increased wait time for headless mode
             print(f"Navigated to login page: {login_url}")
             
             # Find phone number input (based on the images provided)
-            phone_input = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='tel'], input[placeholder*='Mobile']"))
+            phone_input = WebDriverWait(self.driver, 15).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, "input[type='tel'], input[placeholder*='Mobile']"))
             )
-            phone_input.clear()
-            phone_input.send_keys(account.username)
-            print(f"Entered phone number: {account.username}")
+            
+            # Enhanced interaction for headless mode
+            try:
+                # Scroll to element and make sure it's visible
+                self.driver.execute_script("arguments[0].scrollIntoView(true);", phone_input)
+                time.sleep(1)
+                
+                # Use JavaScript to clear and enter phone number for more reliability
+                self.driver.execute_script("arguments[0].value = '';", phone_input)
+                time.sleep(0.5)
+                self.driver.execute_script("arguments[0].value = arguments[1];", phone_input, account.username)
+                
+                # Trigger input events to notify the frontend framework
+                self.driver.execute_script("""
+                    arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+                    arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+                """, phone_input)
+                
+                print(f"Entered phone number using JavaScript: {account.username}")
+                
+            except Exception as js_error:
+                print(f"JavaScript method failed, trying Selenium: {js_error}")
+                # Fallback to Selenium methods
+                phone_input.clear()
+                phone_input.send_keys(account.username)
+                print(f"Entered phone number using Selenium: {account.username}")
             
             # Find password input
-            password_input = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='password']"))
+            password_input = WebDriverWait(self.driver, 15).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, "input[type='password']"))
             )
-            password_input.clear()
-            password_input.send_keys(account.password)
-            print(f"Entered password: {account.password}")
+            
+            # Enhanced interaction for password field
+            try:
+                # Scroll to element and make sure it's visible
+                self.driver.execute_script("arguments[0].scrollIntoView(true);", password_input)
+                time.sleep(1)
+                
+                # Use JavaScript to clear and enter password
+                self.driver.execute_script("arguments[0].value = '';", password_input)
+                time.sleep(0.5)
+                self.driver.execute_script("arguments[0].value = arguments[1];", password_input, account.password)
+                
+                # Trigger input events
+                self.driver.execute_script("""
+                    arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+                    arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+                """, password_input)
+                
+                print(f"Entered password using JavaScript")
+                
+            except Exception as js_error:
+                print(f"JavaScript method failed for password, trying Selenium: {js_error}")
+                # Fallback to Selenium methods
+                password_input.clear()
+                password_input.send_keys(account.password)
+                print(f"Entered password using Selenium")
             
             # Find and click login button
-            login_button = WebDriverWait(self.driver, 10).until(
+            login_button = WebDriverWait(self.driver, 15).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "button[type='submit'], .v-button.btn.login.popper-input-button"))
             )
-            login_button.click()
-            print(f"Clicked login button")
             
-            # Wait for login to complete
-            time.sleep(5)
+            # Enhanced button clicking for headless mode
+            try:
+                # Scroll to button and make sure it's visible
+                self.driver.execute_script("arguments[0].scrollIntoView(true);", login_button)
+                time.sleep(1)
+                
+                # Try JavaScript click first
+                self.driver.execute_script("arguments[0].click();", login_button)
+                print(f"Clicked login button using JavaScript")
+                
+            except Exception as js_error:
+                print(f"JavaScript click failed, trying Selenium: {js_error}")
+                # Fallback to Selenium click
+                login_button.click()
+                print(f"Clicked login button using Selenium")
+            
+            # Wait for login to complete (increased timeout for headless)
+            time.sleep(8)
             
             # Check if login was successful by looking for user profile or betting interface
             try:
                 # Look for elements that indicate successful login
-                WebDriverWait(self.driver, 10).until(
+                WebDriverWait(self.driver, 15).until(
                     EC.any_of(
                         EC.presence_of_element_located((By.CSS_SELECTOR, ".account--balance.account-item.tw-text-yellow")),
                         EC.url_contains("home"),
@@ -416,7 +476,7 @@ class BetEngine(WebsiteOpener):
                 # If this is the first account, also store cookies in the class for search functionality
                 if self.__accounts and account == self.__accounts[0]:
                     self.__cookie_jar = account.cookie_jar
-                
+            
                 return True
                     
             except TimeoutException:
@@ -522,7 +582,7 @@ class BetEngine(WebsiteOpener):
                             if should_skip:
                                 print(f"Skipping variant team: {event_name}")
                                 continue
-                                
+                            
                             # Calculate match score based on word matching
                             match_score = 0
                             home_words = set(word.lower() for word in home_team.lower().split() if len(word) > 1)
@@ -543,7 +603,7 @@ class BetEngine(WebsiteOpener):
                             else:
                                 continue
                             
-                                
+
                             # Check start time if available
                             time_match_score = 0
                             if pinnacle_start_time and "startTime" in event:
@@ -566,8 +626,8 @@ class BetEngine(WebsiteOpener):
                                 potential_matches.append({
                                 "event_name": f"{event.get('homeTeam')} vs {event.get('awayTeam')}",
                                 "event_id": event_id,
-                                "score": match_score,
-                                "strategy": search_term,
+                                    "score": match_score,
+                                    "strategy": search_term,
                                 "home_team": event.get('homeTeam'),
                                 "away_team": event.get('awayTeam')
                             })
@@ -764,8 +824,8 @@ class BetEngine(WebsiteOpener):
                         raise Exception("All click methods failed")
                         
             except Exception as e:
-                    print(f"Could not click market element: {e}")
-                    return False
+                print(f"Could not click market element: {e}")
+                return False
             
             # Enter stake amount
             try:
@@ -2245,8 +2305,8 @@ class BetEngine(WebsiteOpener):
                 "away": "Arsenal"
             },
             "category": {
-            "type": "spread",  # Changed from "moneyline" to "spread" for handicap
-            "meta": {
+                "type": "spread",  # Changed from "moneyline" to "spread" for handicap
+                "meta": {
                     "team": "home",  # for handicap: "home" or "away"
                     "value": "-0.5"  # handicap value (e.g., "-0.5", "+1.5", "-1.0")
                 }

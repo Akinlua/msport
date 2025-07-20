@@ -1,24 +1,8 @@
 {
     "accounts": [
         {
-            "username": "Zaipase",
-            "password": "Samuel1122#",
-            "active": true,
-            "max_concurrent_bets": 20,
-            "min_balance": 100,
-            "proxy": "http://156.228.90.117:3129"
-        },
-        {
-            "username": "2349069948695",
-            "password": "philip3912",
-            "active": true,
-            "max_concurrent_bets": 20,
-            "min_balance": 100,
-            "proxy": "http://156.233.88.27:3129"
-        },
-        {
-            "username": "2349021096912",
-            "password": "X0X01199.",
+            "username": "8168309913",
+            "password": "numeric0157",
             "active": true,
             "max_concurrent_bets": 20,
             "min_balance": 100,
@@ -26,7 +10,7 @@
         }
     ],
     "max_total_concurrent_bets": 20,
-    "use_proxies": true,
+    "use_proxies": false,
     "bet_settings": {
         "min_ev": 5.5,
         "kelly_fraction": 0.3,
