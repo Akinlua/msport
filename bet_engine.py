@@ -7,11 +7,8 @@ import requests
 import dotenv
 import threading
 import queue
-from selenium.webdriver.common.by import By
-from selenium.common.exceptions import NoSuchElementException, TimeoutException
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.action_chains import ActionChains
+import asyncio
+from selenium_driverless.types.by import By
 from utils.calculate_no_vig_prices import calculate_no_vig_prices
 from utils.calculate_ev import calculate_ev
 from scipy.optimize import minimize_scalar
@@ -103,10 +100,33 @@ class BetEngine(WebsiteOpener):
     def _initialize_browser_if_needed(self):
         """Initialize the browser if it hasn't been initialized yet"""
         if not self.__browser_initialized:
+            print("Initializing browser...")
             super().__init__(self.__headless)
             self.__browser_initialized = True
             self.__browser_open = True
-            print("Browser initialized")
+            
+            # Verify that driver is actually set up
+            if not hasattr(self, 'driver') or self.driver is None:
+                print("Driver not properly initialized, attempting manual setup...")
+                if hasattr(self, 'setup_driver'):
+                    success = self.setup_driver(self.__headless)
+                    if not success or self.driver is None:
+                        raise Exception("Failed to initialize selenium-driverless driver")
+                else:
+                    raise Exception("WebsiteOpener does not have setup_driver method")
+                    
+            print(f"Browser initialized successfully. Driver: {type(self.driver)}")
+        elif not self.__browser_open:
+            print("Browser was closed, reinitializing...")
+            if hasattr(self, 'setup_driver'):
+                success = self.setup_driver(self.__headless)
+                if success and self.driver is not None:
+                    self.__browser_open = True
+                    print("Browser reinitialized successfully")
+                else:
+                    raise Exception("Failed to reinitialize selenium-driverless driver")
+            else:
+                raise Exception("Cannot reinitialize browser: setup_driver method not available")
         
     def __load_config(self, config_file):
         """Load configuration from JSON file"""
@@ -222,15 +242,30 @@ class BetEngine(WebsiteOpener):
         if self.__accounts and not self.__skip_initial_login:
             print("Attempting initial login for all accounts...")
             try:
-                for account in self.__accounts:
-                    try:
-                        self.__do_login_for_account(account)
-                        print(f"Successfully logged in account: {account.username}")
-                    except Exception as e:
-                        print(f"Failed to login account {account.username} during setup: {e}")
-                        print("Account will be available for retry later")
-                        # Continue with other accounts instead of crashing
-                        continue
+                # Initialize browser first since login needs it
+                self._initialize_browser_if_needed()
+                
+                # Set up async environment for login
+                if not hasattr(self, '_loop') or not self._loop:
+                    self._loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(self._loop)
+                
+                async def login_all_accounts():
+                    for account in self.__accounts:
+                        try:
+                            await self.__do_login_for_account(account)
+                            print(f"Successfully logged in account: {account.username}")
+                        except Exception as e:
+                            print(f"Failed to login account {account.username} during setup: {e}")
+                            print("Account will be available for retry later")
+                            # Continue with other accounts instead of crashing
+                            continue
+                
+                # Run the async login process
+                self._loop.run_until_complete(login_all_accounts())
+                
+            except Exception as e:
+                print(f"Error during account setup: {e}")
             finally:
                 # Close browser after all login attempts are complete
                 if self.__browser_initialized:
@@ -349,7 +384,7 @@ class BetEngine(WebsiteOpener):
             print(f"Error fetching balance for account {account.username}: {e}")
             return 0
 
-    def __do_login_for_account(self, account):
+    async def __do_login_for_account(self, account):
         """Log in to MSport website with a specific account using selenium"""
         print(f"Logging in to MSport with account: {account.username}")
         
@@ -362,31 +397,60 @@ class BetEngine(WebsiteOpener):
             
             # Navigate to MSport login page
             login_url = f"{self.__bet_host}"
-            self.driver.get(login_url)
+            self.open_url(login_url)
             time.sleep(2)
             print(f"Navigated to login page: {login_url}")
             
-            # Find phone number input (based on the images provided)
-            phone_input = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='tel'], input[placeholder*='Mobile']"))
-            )
-            phone_input.clear()
-            phone_input.send_keys(account.username)
+            # Try multiple selectors for phone number input
+            print("Looking for phone number input field...")
+            phone_input = None
+            phone_selectors = [
+                (By.CSS_SELECTOR, "input[type='tel']"),
+                (By.CSS_SELECTOR, "input[placeholder*='Mobile']"),
+                (By.CSS_SELECTOR, "input[placeholder*='mobile']"),
+                (By.CSS_SELECTOR, "input[placeholder*='Phone']"),
+                (By.CSS_SELECTOR, "input[placeholder*='phone']"),
+                (By.CSS_SELECTOR, "input[name*='mobile']"),
+                (By.CSS_SELECTOR, "input[name*='phone']"),
+                (By.CSS_SELECTOR, "input[id*='mobile']"),
+                (By.CSS_SELECTOR, "input[id*='phone']"),
+                (By.XPATH, "//input[@type='tel']"),
+                (By.XPATH, "//input[contains(@placeholder, 'mobile')]"),
+                (By.XPATH, "//input[contains(@placeholder, 'Mobile')]"),
+                (By.XPATH, "//input[contains(@placeholder, 'Phone')]"),
+                (By.XPATH, "//input[contains(@placeholder, 'phone')]")
+            ]
+            
+            # for by, selector in phone_selectors:
+            #     try:
+            #         print(f"Trying {by}: {selector}")
+            #         phone_input = self._wait_for_element(by, selector, 3)
+                    
+            #         if phone_input:
+            #             print(f"✅ Found phone input with: {by} = {selector}")
+            #             break
+            #     except Exception as e:
+            #         print(f"❌ Failed with {by} = {selector}: {e}")
+            #         continue
+            
+            phone_input = await self.driver.find_element(By.CSS_SELECTOR, "input[type='tel']", timeout=3)
+            if not phone_input:
+                print("Could not find phone number input field with any selector")
+                raise Exception("Phone input field not found")
+            
+            await phone_input.clear()
+            await phone_input.send_keys(account.username)
             print(f"Entered phone number: {account.username}")
             
             # Find password input
-            password_input = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='password']"))
-            )
-            password_input.clear()
-            password_input.send_keys(account.password)
+            password_input = await self.driver.find_element(By.CSS_SELECTOR, "input[type='password']", timeout=10)
+            await password_input.clear()
+            await password_input.send_keys(account.password)
             print(f"Entered password: {account.password}")
             
             # Find and click login button
-            login_button = WebDriverWait(self.driver, 10).until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, "button[type='submit'], .v-button.btn.login.popper-input-button"))
-            )
-            login_button.click()
+            login_button = await self.driver.find_element(By.CSS_SELECTOR, "button[type='submit'], .v-button.btn.login.popper-input-button", timeout=10)
+            await login_button.click()
             print(f"Clicked login button")
             
             # Wait for login to complete
@@ -396,44 +460,141 @@ class BetEngine(WebsiteOpener):
             try:
                 timestamp = time.strftime("%Y%m%d-%H%M%S")
                 screenshot_path = f"logindone_{timestamp}.png"
-                self.driver.save_screenshot(screenshot_path)
-                print(f"Error screenshot saved to {screenshot_path}")
+                if hasattr(self, 'driver') and self.driver is not None:
+                    await self.driver.save_screenshot(screenshot_path)
+                    print(f"Error screenshot saved to {screenshot_path}")
+                else:
+                    print("Cannot take screenshot: driver not available")
             except Exception as screenshot_error:
                 print(f"Failed to take error screenshot: {screenshot_error}")
             # Check if login was successful by looking for user profile or betting interface
             try:
-                # Look for elements that indicate successful login
-                WebDriverWait(self.driver, 10).until(
-                    EC.any_of(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, ".account--balance.account-item.tw-text-yellow")),
-                        EC.url_contains("home"),
-                        EC.url_contains("sports")
-                    )
-                )
-                print(f"Login successful for account: {account.username}")
+                # Look for elements that indicate successful login - wait up to 10 seconds
+                success_element = await self._wait_for_any_element_async([
+                    (By.CSS_SELECTOR, ".account--balance.account-item.tw-text-yellow"),
+                ], 10)
                 
-                # Get cookies from selenium
-                selenium_cookies = self.driver.get_cookies()
-                account.set_cookie_jar(selenium_cookies)
-                
-                # Fetch account balance after successful login
-                balance = self.__fetch_account_balance(account)
-                account.balance = balance
-                print(f"Updated account balance: {balance:.2f}")
-            
-                # If this is the first account, also store cookies in the class for search functionality
-                if self.__accounts and account == self.__accounts[0]:
-                    self.__cookie_jar = account.cookie_jar
-                
-                return True
+                if success_element:
+                    print(f"Login successful for account: {account.username}")
                     
-            except TimeoutException:
-                print(f"Login may have failed for account: {account.username}")
+                    # Get cookies from selenium
+                    selenium_cookies = await self.driver.get_cookies()
+                    account.set_cookie_jar(selenium_cookies)
+                    
+                    # Fetch account balance after successful login
+                    balance = self.__fetch_account_balance(account)
+                    account.balance = balance
+                    print(f"Updated account balance: {balance:.2f}")
+            
+                    # If this is the first account, also store cookies in the class for search functionality
+                    if self.__accounts and account == self.__accounts[0]:
+                        self.__cookie_jar = account.cookie_jar
+            
+                    return True
+                else:
+                    print(f"Login may have failed for account: {account.username}")
+                    raise Exception("Login verification timeout")
+                    
+            except Exception as login_check_error:
+                print(f"Login verification failed for account: {account.username}: {login_check_error}")
                 raise Exception("Login verification timeout")
                 
         except Exception as e:
             print(f"Login failed for account: {account.username}: {e}")
             raise
+
+    def _wait_for_element(self, by, value, timeout=10):
+        """Wait for element to be present using selenium-driverless timeout."""
+        if not hasattr(self, '_loop') or not self._loop:
+            self._loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self._loop)
+        
+        async def _async_wait():
+            try:
+                # Use selenium-driverless native timeout functionality
+                element = await self.driver.find_element(by, value, timeout=timeout)
+                return element
+            except Exception as e:
+                raise Exception(f"Element not found after {timeout} seconds: {by}={value}")
+        
+        return self._loop.run_until_complete(_async_wait())
+    
+    def _wait_for_element_clickable(self, by, value, timeout=10):
+        """Wait for element to be clickable using selenium-driverless timeout."""
+        if not hasattr(self, '_loop') or not self._loop:
+            self._loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self._loop)
+        
+        async def _async_wait():
+            try:
+                # Use selenium-driverless native timeout functionality
+                element = await self.driver.find_element(by, value, timeout=timeout)
+                if element:
+                    # Check if element is displayed and enabled
+                    is_displayed = await element.is_displayed()
+                    is_enabled = await element.is_enabled()
+                    if is_displayed and is_enabled:
+                        return element
+                    else:
+                        raise Exception(f"Element found but not clickable: displayed={is_displayed}, enabled={is_enabled}")
+                else:
+                    raise Exception("Element not found")
+            except Exception as e:
+                raise Exception(f"Clickable element not found after {timeout} seconds: {by}={value}")
+        
+        return self._loop.run_until_complete(_async_wait())
+    
+    def _wait_for_element_clickable_direct(self, element, timeout=10):
+        """Wait for a specific element to be clickable using simple polling."""
+        if not hasattr(self, '_loop') or not self._loop:
+            self._loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self._loop)
+        
+        async def _async_wait():
+            start_time = time.time()
+            while time.time() - start_time < timeout:
+                try:
+                    is_displayed = await element.is_displayed()
+                    is_enabled = await element.is_enabled()
+                    if is_displayed and is_enabled:
+                        return element
+                except:
+                    pass
+                await asyncio.sleep(0.5)
+            raise Exception(f"Element not clickable after {timeout} seconds")
+        
+        return self._loop.run_until_complete(_async_wait())
+    
+    def _wait_for_any_element(self, selectors, timeout=10):
+        """Wait for any of the provided selectors to be present using selenium-driverless timeout."""
+        if not hasattr(self, '_loop') or not self._loop:
+            self._loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self._loop)
+        
+        async def _async_wait():
+            for by, value in selectors:
+                try:
+                    # Use selenium-driverless native timeout with short timeout for each selector
+                    element = await self.driver.find_element(by, value, timeout=2)
+                    if element:
+                        return element
+                except:
+                    continue
+            return None
+        
+        return self._loop.run_until_complete(_async_wait())
+
+    async def _wait_for_any_element_async(self, selectors, timeout=10):
+        """Async version of wait for any of the provided selectors to be present."""
+        for by, value in selectors:
+            try:
+                # Use selenium-driverless native timeout with short timeout for each selector
+                element = await self.driver.find_element(by, value, timeout=2)
+                if element:
+                    return element
+            except:
+                continue
+        return None
 
     def __search_event(self, home_team, away_team, pinnacle_start_time=None):
         """
@@ -517,7 +678,7 @@ class BetEngine(WebsiteOpener):
                             if not event_id:
                                 continue
                                 
-                            # Skip events with variant indicators that don't exist in the original team names
+                                # Skip events with variant indicators that don't exist in the original team names
                             event_name = f"{home_team_name} vs {away_team_name}"
                             should_skip = False
                             for indicator in variant_indicators:
@@ -610,7 +771,7 @@ class BetEngine(WebsiteOpener):
             details_url = f"{self.__bet_api_host}/match/detail"
             params = {
                 'eventId': event_id
-            }
+        }
         
             headers = {
                 "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
@@ -670,7 +831,7 @@ class BetEngine(WebsiteOpener):
             print(f"Error generating MSport bet URL: {e}")
             return None
 
-    def __place_bet_with_selenium(self, account, bet_url, market_type, outcome, odds, stake, points=None):
+    async def __place_bet_with_selenium(self, account, bet_url, market_type, outcome, odds, stake, points=None):
         """
         Place a bet on MSport using Selenium
         
@@ -692,14 +853,17 @@ class BetEngine(WebsiteOpener):
             try:
                 timestamp = time.strftime("%Y%m%d-%H%M%S")
                 screenshot_path = f"login1_{timestamp}.png"
-                self.driver.save_screenshot(screenshot_path)
-                print(f"Error screenshot saved to {screenshot_path}")
+                if hasattr(self, 'driver') and self.driver is not None:
+                    self.driver.save_screenshot(screenshot_path)
+                    print(f"Error screenshot saved to {screenshot_path}")
+                else:
+                    print("Cannot take screenshot: driver not available")
             except Exception as screenshot_error:
                 print(f"Failed to take error screenshot: {screenshot_error}")
             
             # Always login before placing bet
             print("Logging in before placing bet...")
-            login_success = self.__do_login_for_account(account)
+            login_success = await self.__do_login_for_account(account)
             if not login_success:
                 print("Login failed, cannot place bet")
                 return False
@@ -709,7 +873,7 @@ class BetEngine(WebsiteOpener):
             time.sleep(3)
             
             # Find and click the market/outcome
-            market_element = self.__get_market_selector(market_type, outcome, points, is_first_half=False)
+            market_element = await self.__get_market_selector(market_type, outcome, points, is_first_half=False)
             print(f"Market element: {market_element}")
             if not market_element:
                 print("Could not find market element")
@@ -720,8 +884,8 @@ class BetEngine(WebsiteOpener):
                 
                 # Verify odds before placing bet
                 try:
-                    odds_element = market_element.find_element(By.CSS_SELECTOR, ".odds")
-                    odds_text = odds_element.text.strip()
+                    odds_element = await market_element.find_element(By.CSS_SELECTOR, ".odds")
+                    odds_text = await odds_element.get_attribute("textContent")
                     import re
                     odds_match = re.search(r'(\d+\.?\d*)', odds_text)
                     if odds_match:
@@ -740,7 +904,7 @@ class BetEngine(WebsiteOpener):
                 # Improved scrolling and clicking approach
                 try:
                     # First, scroll the element into view with some offset to avoid header overlap
-                    self.driver.execute_script("""
+                    await self.driver.execute_script("""
                         var element = arguments[0];
                         var elementRect = element.getBoundingClientRect();
                         var absoluteElementTop = elementRect.top + window.pageYOffset;
@@ -750,18 +914,18 @@ class BetEngine(WebsiteOpener):
                     time.sleep(1)
                     
                     # Wait for element to be clickable
-                    WebDriverWait(self.driver, 10).until(
-                        EC.element_to_be_clickable((By.CSS_SELECTOR, f"#{market_element.get_attribute('id')}")) if market_element.get_attribute('id') else 
-                        EC.element_to_be_clickable(market_element)
-                    )
+                    try:
+                        self._wait_for_element_clickable_direct(market_element, 10)
+                    except Exception as e:
+                        print(f"Element may not be clickable: {e}")
                     
                     # Try JavaScript click if regular click fails
                     try:
-                        market_element.click()
+                        await market_element.click()
                         print(f"Clicked on market: {market_type} - {outcome} - {points}")
                     except Exception as click_error:
                         print(f"Regular click failed, trying JavaScript click: {click_error}")
-                        self.driver.execute_script("arguments[0].click();", market_element)
+                        await self.driver.execute_script("arguments[0].click();", market_element)
                         print(f"JavaScript clicked on market: {market_type} - {outcome} - {points}")
                     
                     time.sleep(2)
@@ -771,12 +935,16 @@ class BetEngine(WebsiteOpener):
                     
                     # Last resort: try moving to element and clicking
                     try:
-                        actions = ActionChains(self.driver)
-                        actions.move_to_element(market_element).click().perform()
-                        print(f"ActionChains clicked on market: {market_type} - {outcome} - {points}")
+                        # Use JavaScript to move to element and click instead of ActionChains
+                        await self.driver.execute_script("""
+                            var element = arguments[0];
+                            element.scrollIntoView({behavior: 'smooth', block: 'center'});
+                            element.click();
+                        """, market_element)
+                        print(f"JavaScript scroll-and-click worked for market: {market_type} - {outcome} - {points}")
                         time.sleep(2)
                     except Exception as action_error:
-                        print(f"ActionChains also failed: {action_error}")
+                        print(f"JavaScript scroll-and-click also failed: {action_error}")
                         raise Exception("All click methods failed")
                         
             except Exception as e:
@@ -817,7 +985,7 @@ class BetEngine(WebsiteOpener):
                 """
                 
                 # Execute the JavaScript with the stake value
-                result = self.driver.execute_script(stake_js_script, str(10))
+                result = await self.driver.execute_script(stake_js_script, str(10))
                 
                 if result:
                     print(f"✅ Successfully entered stake: 10 using JavaScript")
@@ -836,12 +1004,10 @@ class BetEngine(WebsiteOpener):
                     
                     for selector in fallback_selectors:
                         try:
-                            stake_input = WebDriverWait(self.driver, 5).until(
-                                EC.presence_of_element_located((By.CSS_SELECTOR, selector))
-                            )
+                            stake_input = self._wait_for_element(By.CSS_SELECTOR, selector, 5)
                             print(f"Found stake input using fallback selector: {selector}")
                             break
-                        except TimeoutException:
+                        except Exception:
                             continue
                     
                     if not stake_input:
@@ -865,9 +1031,7 @@ class BetEngine(WebsiteOpener):
                 place_bet_button = None
                 
                 try:
-                    place_bet_button = WebDriverWait(self.driver, 10).until(
-                        EC.element_to_be_clickable((By.CSS_SELECTOR, "button.v-button.m-place-btn"))
-                    )
+                    place_bet_button = self._wait_for_element_clickable(By.CSS_SELECTOR, "button.v-button.m-place-btn", 10)
                     print("Found place bet button using specific CSS class")
                     
                 except Exception as e:
@@ -889,16 +1053,12 @@ class BetEngine(WebsiteOpener):
                     for selector in fallback_button_selectors:
                         try:
                             if selector.startswith("//"):
-                                place_bet_button = WebDriverWait(self.driver, 5).until(
-                                    EC.element_to_be_clickable((By.XPATH, selector))
-                                )
+                                place_bet_button = self._wait_for_element_clickable(By.XPATH, selector, 5)
                             else:
-                                place_bet_button = WebDriverWait(self.driver, 5).until(
-                                    EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
-                                )
+                                place_bet_button = self._wait_for_element_clickable(By.CSS_SELECTOR, selector, 5)
                             print(f"Found bet button using fallback selector: {selector}")
                             break
-                        except TimeoutException:
+                        except Exception:
                             continue
                 
                 if not place_bet_button:
@@ -908,7 +1068,7 @@ class BetEngine(WebsiteOpener):
                 # Improved scrolling and clicking approach for bet button (same as market selector)
                 try:
                     # First, scroll the button into view with some offset to avoid other elements
-                    self.driver.execute_script("""
+                    await self.driver.execute_script("""
                         var element = arguments[0];
                         var elementRect = element.getBoundingClientRect();
                         var absoluteElementTop = elementRect.top + window.pageYOffset;
@@ -918,17 +1078,18 @@ class BetEngine(WebsiteOpener):
                     time.sleep(1)
                     
                     # Wait for button to be clickable
-                    WebDriverWait(self.driver, 10).until(
-                        EC.element_to_be_clickable(place_bet_button)
-                    )
+                    try:
+                        self._wait_for_element_clickable_direct(place_bet_button, 10)
+                    except Exception as e:
+                        print(f"Button may not be clickable: {e}")
                     
                     # Try JavaScript click if regular click fails
                     try:
-                        place_bet_button.click()
+                        await place_bet_button.click()
                         print("Clicked place bet button")
                     except Exception as click_error:
                         print(f"Regular click failed, trying JavaScript click: {click_error}")
-                        self.driver.execute_script("arguments[0].click();", place_bet_button)
+                        await self.driver.execute_script("arguments[0].click();", place_bet_button)
                         print("JavaScript clicked place bet button")
                     
                     time.sleep(3)
@@ -938,12 +1099,16 @@ class BetEngine(WebsiteOpener):
                     
                     # Last resort: try moving to element and clicking
                     try:
-                        actions = ActionChains(self.driver)
-                        actions.move_to_element(place_bet_button).click().perform()
-                        print("ActionChains clicked place bet button")
+                        # Use JavaScript to move to element and click instead of ActionChains
+                        await self.driver.execute_script("""
+                            var element = arguments[0];
+                            element.scrollIntoView({behavior: 'smooth', block: 'center'});
+                            element.click();
+                        """, place_bet_button)
+                        print("JavaScript scroll-and-click worked for bet button")
                         time.sleep(3)
                     except Exception as action_error:
-                        print(f"ActionChains also failed for bet button: {action_error}")
+                        print(f"JavaScript scroll-and-click also failed for bet button: {action_error}")
                         raise Exception("All click methods failed for bet button")
                 
                 # Check for success confirmation
@@ -959,12 +1124,11 @@ class BetEngine(WebsiteOpener):
                     success_found = False
                     for selector in success_selectors:
                         try:
-                            WebDriverWait(self.driver, 5).until(
-                                EC.presence_of_element_located((By.XPATH, selector))
-                            )
-                            success_found = True
-                            break
-                        except TimeoutException:
+                            success_element = self._wait_for_element(By.XPATH, selector, 5)
+                            if success_element:
+                                success_found = True
+                                break
+                        except Exception:
                             continue
                     
                     if success_found:
@@ -988,15 +1152,18 @@ class BetEngine(WebsiteOpener):
             try:
                 timestamp = time.strftime("%Y%m%d-%H%M%S")
                 screenshot_path = f"error_screenshot_{timestamp}.png"
-                self.driver.save_screenshot(screenshot_path)
-                print(f"Error screenshot saved to {screenshot_path}")
+                if hasattr(self, 'driver') and self.driver is not None:
+                    self.driver.save_screenshot(screenshot_path)
+                    print(f"Error screenshot saved to {screenshot_path}")
+                else:
+                    print("Cannot take error screenshot: driver not available")
             except Exception as screenshot_error:
                 print(f"Failed to take error screenshot: {screenshot_error}")
             import traceback
             traceback.print_exc()
             return False
 
-    def __get_market_selector(self, market_type, outcome, points=None, is_first_half=False):
+    async def __get_market_selector(self, market_type, outcome, points=None, is_first_half=False):
         """
         Get the CSS selector for a specific market and outcome on MSport
         
@@ -1016,8 +1183,8 @@ class BetEngine(WebsiteOpener):
         if is_first_half:
             # Click halftime button first
             try:
-                halftime_button = self.driver.find_element(By.CSS_SELECTOR, ".m-sub-nav-item.snap-nav-item:nth-child(4)")
-                halftime_button.click()
+                halftime_button = await self.driver.find_element(By.CSS_SELECTOR, ".m-sub-nav-item.snap-nav-item:nth-child(4)")
+                await halftime_button.click()
                 time.sleep(2)
                 print("Clicked halftime tab")
             except Exception as e:
@@ -1026,7 +1193,7 @@ class BetEngine(WebsiteOpener):
         
         # Get all market rows
         try:
-            market_rows = self.driver.find_elements(By.CSS_SELECTOR, ".m-market-row.m-market-row--3")
+            market_rows = await self.driver.find_elements(By.CSS_SELECTOR, ".m-market-row.m-market-row--3")
             if not market_rows:
                 print("No market rows found")
                 return None
@@ -1036,23 +1203,23 @@ class BetEngine(WebsiteOpener):
         
         # 1X2 (Moneyline) - First div from the list
         if market_type_lower == "moneyline" or market_type_lower == "money_line":
-            return self.__find_1x2_outcome(market_rows[0] if market_rows else None, outcome_lower)
+            return await self.__find_1x2_outcome(market_rows[0] if market_rows else None, outcome_lower)
         
         # Over/Under
         elif market_type_lower == "total":
             if not points:
                 return None
-            return self.__find_total_outcome(points, outcome_lower)
+            return await self.__find_total_outcome(points, outcome_lower)
         
         # Asian Handicap
         elif market_type_lower == "spread":
             if not points:
                 return None
-            return self.__find_handicap_outcome(points, outcome_lower)
+            return await self.__find_handicap_outcome(points, outcome_lower)
         
         return None
     
-    def __find_1x2_outcome(self, market_row, outcome):
+    async def __find_1x2_outcome(self, market_row, outcome):
         """
         Find the 1X2 outcome element
         
@@ -1069,7 +1236,7 @@ class BetEngine(WebsiteOpener):
             
         try:
             # Get all outcome divs with class "has-desc m-outcome multiple"
-            outcome_divs = market_row.find_elements(By.CSS_SELECTOR, ".has-desc.m-outcome.multiple")
+            outcome_divs = await market_row.find_elements(By.CSS_SELECTOR, ".has-desc.m-outcome.multiple")
             
             if len(outcome_divs) < 3:
                 print(f"Expected 3 outcomes for 1X2, found {len(outcome_divs)}")
@@ -1086,8 +1253,8 @@ class BetEngine(WebsiteOpener):
             
             # Verify odds by checking inner "odds" class
             try:
-                odds_element = target_div.find_element(By.CSS_SELECTOR, ".odds")
-                odds_text = odds_element.text.strip()
+                odds_element = await target_div.find_element(By.CSS_SELECTOR, ".odds")
+                odds_text = await odds_element.get_attribute("textContent")
                 print(f"Found 1X2 {outcome} with odds: {odds_text}")
                 return target_div
             except Exception as e:
@@ -1098,7 +1265,7 @@ class BetEngine(WebsiteOpener):
             print(f"Error finding 1X2 outcome: {e}")
             return None
     
-    def __find_total_outcome(self, target_points, outcome):
+    async def __find_total_outcome(self, target_points, outcome):
         """
         Find the over/under outcome element
         
@@ -1111,7 +1278,7 @@ class BetEngine(WebsiteOpener):
         """
         try:
             # Get all market specifier divs
-            specifier_divs = self.driver.find_elements(By.CSS_SELECTOR, ".m-market-specifier")
+            specifier_divs = await self.driver.find_elements(By.CSS_SELECTOR, ".m-market-specifier")
             
             if not specifier_divs:
                 print("No market specifier divs found for totals")
@@ -1121,13 +1288,13 @@ class BetEngine(WebsiteOpener):
             ou_specifier = specifier_divs[0]
             
             # Get all market rows within this specifier
-            ou_rows = ou_specifier.find_elements(By.CSS_SELECTOR, ".m-market-row.m-market-row")
+            ou_rows = await ou_specifier.find_elements(By.CSS_SELECTOR, ".m-market-row.m-market-row")
             
             for row in ou_rows:
                 try:
                     # Check if this row has the target points
-                    desc_element = row.find_element(By.CSS_SELECTOR, ".m-outcome.m-outcome-desc span")
-                    points_text = desc_element.text.strip()
+                    desc_element = await row.find_element(By.CSS_SELECTOR, ".m-outcome.m-outcome-desc span")
+                    points_text = await desc_element.get_attribute("textContent")
                     
                     # Extract points value
                     import re
@@ -1138,10 +1305,17 @@ class BetEngine(WebsiteOpener):
                         # Check if this matches our target points
                         if abs(row_points - float(target_points)) < 0.01:
                             # Found the right row, now get over (first) or under (second) outcome
-                            outcome_divs = row.find_elements(By.CSS_SELECTOR, ".m-outcome")
+                            outcome_divs = await row.find_elements(By.CSS_SELECTOR, ".m-outcome")
                             
                             # Filter to get only the betting outcomes (not the description one)
-                            betting_outcomes = [div for div in outcome_divs if div.find_elements(By.CSS_SELECTOR, ".odds")]
+                            betting_outcomes = []
+                            for div in outcome_divs:
+                                try:
+                                    odds_elements = await div.find_elements(By.CSS_SELECTOR, ".odds")
+                                    if odds_elements:
+                                        betting_outcomes.append(div)
+                                except:
+                                    continue
                             
                             if len(betting_outcomes) < 2:
                                 print(f"Expected 2 betting outcomes for totals, found {len(betting_outcomes)}")
@@ -1152,8 +1326,8 @@ class BetEngine(WebsiteOpener):
                             
                             # Verify odds
                             try:
-                                odds_element = target_div.find_element(By.CSS_SELECTOR, ".odds")
-                                odds_text = odds_element.text.strip()
+                                odds_element = await target_div.find_element(By.CSS_SELECTOR, ".odds")
+                                odds_text = await odds_element.get_attribute("textContent")
                                 print(f"Found total {outcome} {target_points} with odds: {odds_text}")
                                 return target_div
                             except Exception as e:
@@ -1171,7 +1345,7 @@ class BetEngine(WebsiteOpener):
             print(f"Error finding total outcome: {e}")
             return None
     
-    def __find_handicap_outcome(self, target_points, outcome):
+    async def __find_handicap_outcome(self, target_points, outcome):
         """
         Find the Asian handicap outcome element
         
@@ -1184,7 +1358,7 @@ class BetEngine(WebsiteOpener):
         """
         try:
             # Get the handicap market div
-            handicap_divs = self.driver.find_elements(By.CSS_SELECTOR, ".m-market-handicap")
+            handicap_divs = await self.driver.find_elements(By.CSS_SELECTOR, ".m-market-handicap")
             
             if not handicap_divs:
                 print("No handicap market divs found")
@@ -1194,12 +1368,12 @@ class BetEngine(WebsiteOpener):
             handicap_div = handicap_divs[0]
             
             # Get all market rows within this handicap div
-            handicap_rows = handicap_div.find_elements(By.CSS_SELECTOR, ".m-market-row.m-market-row")
+            handicap_rows = await handicap_div.find_elements(By.CSS_SELECTOR, ".m-market-row.m-market-row")
             
             for row in handicap_rows:
                 try:
                     # Get both home and away outcome divs
-                    outcome_divs = row.find_elements(By.CSS_SELECTOR, ".has-desc.m-outcome.multiple")
+                    outcome_divs = await row.find_elements(By.CSS_SELECTOR, ".has-desc.m-outcome.multiple")
                     
                     if len(outcome_divs) < 2:
                         print(f"Expected 2 outcomes for handicap, found {len(outcome_divs)}")
@@ -1210,8 +1384,8 @@ class BetEngine(WebsiteOpener):
                     
                     # Check the desc to see if it matches our target points
                     try:
-                        desc_element = target_div.find_element(By.CSS_SELECTOR, ".desc")
-                        desc_text = desc_element.text.strip()
+                        desc_element = await target_div.find_element(By.CSS_SELECTOR, ".desc")
+                        desc_text = await desc_element.get_attribute("textContent")
                         
                         # Extract points value from description
                         import re
@@ -1223,8 +1397,8 @@ class BetEngine(WebsiteOpener):
                             if abs(row_points - float(target_points)) < 0.01:
                                 # Verify odds
                                 try:
-                                    odds_element = target_div.find_element(By.CSS_SELECTOR, ".odds")
-                                    odds_text = odds_element.text.strip()
+                                    odds_element = await target_div.find_element(By.CSS_SELECTOR, ".odds")
+                                    odds_text = await odds_element.get_attribute("textContent")
                                     print(f"Found handicap {outcome} {target_points} with odds: {odds_text}")
                                     return target_div
                                 except Exception as e:
@@ -1283,25 +1457,27 @@ class BetEngine(WebsiteOpener):
                 print(f"Checking account {account.username}")
                 if account.can_place_bet():
                     print(f"Account {account.username} can place bet")
-                    # Check if login is needed
-                    # if account.needs_login():
-                    #     try:
-                    #         self.__do_login_for_account(account)
-                    #     except Exception as e:
-                    #         print(f"Failed to login to account {account.username}: {e}")
-                    #         continue  # Try next account
                     
                     # Try to place bet with this account
                     account.increment_bets()
-                    success = self.__place_bet_with_selenium(
-                        account,
-                        self.__generate_msport_bet_url(bet_data["event_details"]),
-                        bet_data["market_type"],
-                        bet_data["outcome"],
-                        bet_data["odds"],
-                        self.__calculate_stake(bet_data["odds"], bet_data["shaped_data"], account.balance),
-                        bet_data["shaped_data"]["category"]["meta"].get("value")
-                    )
+                    
+                    # Set up async environment for bet placement
+                    if not hasattr(self, '_loop') or not self._loop:
+                        self._loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(self._loop)
+                    
+                    async def place_single_bet():
+                        return await self.__place_bet_with_selenium(
+                            account,
+                            self.__generate_msport_bet_url(bet_data["event_details"]),
+                            bet_data["market_type"],
+                            bet_data["outcome"],
+                            bet_data["odds"],
+                            self.__calculate_stake(bet_data["odds"], bet_data["shaped_data"], account.balance),
+                            bet_data["shaped_data"]["category"]["meta"].get("value")
+                        )
+                    
+                    success = self._loop.run_until_complete(place_single_bet())
                     
                     if success:
                         account.decrement_bets()
@@ -2255,7 +2431,7 @@ class BetEngine(WebsiteOpener):
         """
         return self.__find_market_bet_code_with_points(event_details, line_type, points, outcome, is_first_half, sport_id, home_team, away_team)
 
-    def test_direct_bet_placement(self):
+    async def test_direct_bet_placement(self):
         """
         Test function to directly test bet placement with real event data
         This bypasses the normal alert flow and tests the CSS selector system
@@ -2265,12 +2441,12 @@ class BetEngine(WebsiteOpener):
         # Example test data - modify these values as needed
         test_data = {
             "game": {
-                "home": "Chelsea",  # Changed to more common teams
-                "away": "Arsenal"
+                    "home": "Chelsea",  # Changed to more common teams
+                    "away": "Arsenal"
             },
             "category": {
-            "type": "spread",  # Changed from "moneyline" to "spread" for handicap
-            "meta": {
+                "type": "spread",  # Changed from "moneyline" to "spread" for handicap
+                "meta": {
                     "team": "home",  # for handicap: "home" or "away"
                     "value": "-0.5"  # handicap value (e.g., "-0.5", "+1.5", "-1.0")
                 }
@@ -2351,22 +2527,22 @@ class BetEngine(WebsiteOpener):
             time.sleep(3)
             
             # Test the new selector system
-            market_element = self.__get_market_selector(line_type, outcome, points, is_first_half=False)
+            market_element = await self.__get_market_selector(line_type, outcome, points, is_first_half=False)
             
             if market_element:
                 print("✅ CSS selector system found market element!")
                 
                 # Try to get odds from the element to verify it's working
                 try:
-                    odds_element = market_element.find_element(By.CSS_SELECTOR, ".odds")
-                    odds_text = odds_element.text.strip()
+                    odds_element = await market_element.find_element(By.CSS_SELECTOR, ".odds")
+                    odds_text = await odds_element.get_attribute("textContent")
                     print(f"   Element odds: {odds_text}")
                     
                     # Test scrolling and element positioning (but don't click)
                     print("   Testing element positioning...")
                     
                     # Use the same improved scrolling logic
-                    self.driver.execute_script("""
+                    await self.driver.execute_script("""
                         var element = arguments[0];
                         var elementRect = element.getBoundingClientRect();
                         var absoluteElementTop = elementRect.top + window.pageYOffset;
@@ -2376,7 +2552,7 @@ class BetEngine(WebsiteOpener):
                     time.sleep(2)
                     
                     # Check if element is now in viewport and clickable
-                    element_rect = self.driver.execute_script("""
+                    element_rect = await self.driver.execute_script("""
                         var element = arguments[0];
                         var rect = element.getBoundingClientRect();
                         return {
@@ -2431,4 +2607,4 @@ if __name__ == "__main__":
     )
     
     # Run the test function instead of the old test
-    bet_engine.test_direct_bet_placement()
+    asyncio.run(bet_engine.test_direct_bet_placement())
