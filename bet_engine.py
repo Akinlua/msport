@@ -392,6 +392,14 @@ class BetEngine(WebsiteOpener):
             # Wait for login to complete
             time.sleep(5)
             
+            # Take screenshot of error state
+            try:
+                timestamp = time.strftime("%Y%m%d-%H%M%S")
+                screenshot_path = f"logindone_{timestamp}.png"
+                self.driver.save_screenshot(screenshot_path)
+                print(f"Error screenshot saved to {screenshot_path}")
+            except Exception as screenshot_error:
+                print(f"Failed to take error screenshot: {screenshot_error}")
             # Check if login was successful by looking for user profile or betting interface
             try:
                 # Look for elements that indicate successful login
@@ -680,6 +688,14 @@ class BetEngine(WebsiteOpener):
         """
         try:
             self._initialize_browser_if_needed()
+
+            try:
+                timestamp = time.strftime("%Y%m%d-%H%M%S")
+                screenshot_path = f"login1_{timestamp}.png"
+                self.driver.save_screenshot(screenshot_path)
+                print(f"Error screenshot saved to {screenshot_path}")
+            except Exception as screenshot_error:
+                print(f"Failed to take error screenshot: {screenshot_error}")
             
             # Always login before placing bet
             print("Logging in before placing bet...")
@@ -968,6 +984,14 @@ class BetEngine(WebsiteOpener):
                 
         except Exception as e:
             print(f"Error placing bet with Selenium: {e}")
+            # Take screenshot of error state
+            try:
+                timestamp = time.strftime("%Y%m%d-%H%M%S")
+                screenshot_path = f"error_screenshot_{timestamp}.png"
+                self.driver.save_screenshot(screenshot_path)
+                print(f"Error screenshot saved to {screenshot_path}")
+            except Exception as screenshot_error:
+                print(f"Failed to take error screenshot: {screenshot_error}")
             import traceback
             traceback.print_exc()
             return False
