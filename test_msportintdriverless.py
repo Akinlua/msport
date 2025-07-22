@@ -59,8 +59,8 @@ def test_event_search():
     
     try:
         # Test search with sample teams
-        home_team = "Besiktas"
-        away_team = "Shakhtar Donetsk"
+        home_team = "Fluminense"
+        away_team = "Palmeiras"
         
         print(f"Searching for event: {home_team} vs {away_team}")
         event_id = bet_engine.search_event(home_team, away_team)
@@ -161,8 +161,8 @@ def test_bet_placement():
         # Test data similar to what would come from Pinnacle
         test_shaped_data = {
             "game": {
-                "away": "Shakhtar Donetsk",
-                "home": "Besiktas"
+                "away": "Palmeiras",
+                "home": "Fluminense"
             },
             "category": {
                 "type": "money_line",
@@ -206,8 +206,8 @@ def test_direct_bet_placement():
     
     try:
         # Step 1: Search for a real event
-        home_team = "Besiktas"
-        away_team = "Shakhtar Donetsk"
+        home_team = "Fluminense"
+        away_team = "Palmeiras"
         
         print(f"Searching for event: {home_team} vs {away_team}")
         event_id = bet_engine.search_event(home_team, away_team)
@@ -322,18 +322,27 @@ def test_direct_bet_placement():
         print("⚠️  WOULD PLACE BET HERE - Uncomment line below to actually place bet")
         print(f"Bet details: {account.username} - {odds} odds - {stake} stake - Handicap: {shaped_data['category']['meta']['value']}")
         
-        bet_success = bet_engine._BetEngine__place_bet_with_selenium(
-            account,
-            bet_url,
-            "spread",  # Changed from "money_line" to "spread"
-            "home",
-            float(odds),
-            stake,
-            shaped_data['category']['meta']['value']  # Pass the handicap points
-        )
+        # Set up async environment for bet placement
+        import asyncio
+        
+        async def place_test_bet():
+            return await bet_engine._BetEngine__place_bet_with_selenium(
+                account,
+                bet_url,
+                "spread",  # Changed from "money_line" to "spread"
+                "home",
+                float(odds),
+                stake,
+                shaped_data['category']['meta']['value']  # Pass the handicap points
+            )
+        
+        # Create event loop and run the async bet placement
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        bet_success = loop.run_until_complete(place_test_bet())
         
         # For testing purposes, let's just simulate success
-        bet_success = True
+        # bet_success = True
         
         if bet_success:
             print("✅ Direct handicap bet placement test completed successfully!")
@@ -361,13 +370,13 @@ def test_url_generation():
     try:
         # Sample event details
         event_details = {
-            "homeTeam": "Besiktas",
-            "awayTeam": "Shakhtar Donetsk",
+            "homeTeam": "Fluminense",
+            "awayTeam": "Palmeiras",
             "eventId": "sr:match:58052699"
         }
         
         url = bet_engine.generate_msport_bet_url(event_details)
-        expected_pattern = "Besiktas/Shakhtar_Donetsk/sr:match:58052699"
+        expected_pattern = "Fluminense/Palmeiras/sr:match:58052699"
         
         print(f"Generated URL: {url}")
         
