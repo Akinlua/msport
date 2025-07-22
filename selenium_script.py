@@ -47,7 +47,7 @@ class WebsiteOpener:
             driver_path = ChromeDriverManager().install()
             print(f"Driver path: {driver_path}")
             self.driver = webdriver.Chrome(
-                service=Service(),
+                service=Service(r'C:\Users\Administrator\Downloads\chromedriver-win64\chromedriver-win64\chromedriver.exe'),
                 options=chrome_options
             )
             
