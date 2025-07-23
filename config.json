@@ -6,11 +6,11 @@
             "active": true,
             "max_concurrent_bets": 20,
             "min_balance": 100,
-            "proxy": "http://154.91.171.203:3129"
+            "proxy": null
         }
     ],
     "max_total_concurrent_bets": 20,
-    "use_proxies": true,
+    "use_proxies": false,
     "captcha": {
         "enabled": true,
         "api_key": "faf467050c2932f855a1a3ef21286af0",
