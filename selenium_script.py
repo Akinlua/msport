@@ -93,7 +93,7 @@ class WebsiteOpener:
         try:
             # Method 1: Try with system chromedriver first (avoid ChromeDriverManager issues)
             print("🔧 Trying system chromedriver...")
-            self.driver = webdriver.Chrome(options=chrome_options)
+            self.driver = webdriver.Chrome(options=chrome_options, service=Service(r'C:\Users\Administrator\Downloads\chromedriver-win64\chromedriver-win64\chromedriver.exe'))
             print("✅ Chrome started with system chromedriver!")
             print("👀 You should see all your bookmarks, extensions, and saved data!")
             
