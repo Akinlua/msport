@@ -6,11 +6,11 @@
             "active": true,
             "max_concurrent_bets": 20,
             "min_balance": 100,
-            "proxy": "http://156.228.104.89:3129"
+            "proxy": null
         }
     ],
     "max_total_concurrent_bets": 20,
-    "use_proxies": true,
+    "use_proxies": false,
     "browser": {
         "use_existing": true,
         "debug_port": 9222
