@@ -11,16 +11,17 @@ from webdriver_manager.chrome import ChromeDriverManager
 class WebsiteOpener:
     """A class to handle opening websites with Selenium."""
 
-    def __init__(self, headless=False):
+    def __init__(self, headless=False, proxy=None):
         """
         Initialize the WebsiteOpener.
         
         Args:
             headless (bool): Whether to run Chrome in headless mode
+            proxy (str): Proxy URL in format "http://host:port" or "http://user:pass@host:port"
         """
-        self.setup_driver(headless)
+        self.setup_driver(headless, proxy)
     
-    def setup_driver(self, headless):
+    def setup_driver(self, headless, proxy=None):
         """Set up the Chrome WebDriver."""
         chrome_options = Options()
         if headless:
@@ -36,11 +37,36 @@ class WebsiteOpener:
         chrome_options.add_experimental_option('useAutomationExtension', False)
         chrome_options.add_argument("--disable-blink-features=AutomationControlled")
         
+        # Add proxy configuration if provided
+        if proxy:
+            print(f"Configuring proxy: {proxy}")
+            # Handle different proxy formats
+            if proxy.startswith("http://") or proxy.startswith("https://"):
+                proxy_url = proxy
+            else:
+                proxy_url = f"http://{proxy}"
+            
+            chrome_options.add_argument(f"--proxy-server={proxy_url}")
+            print(f"Added proxy argument: --proxy-server={proxy_url}")
+            
+            # Add additional proxy-related arguments for better compatibility
+            # chrome_options.add_argument("--ignore-certificate-errors")
+            # chrome_options.add_argument("--ignore-ssl-errors")
+            # chrome_options.add_argument("--ignore-certificate-errors-spki-list")
+            
+            # Add arguments to handle proxy authentication
+            chrome_options.add_argument("--disable-web-security")
+            chrome_options.add_argument("--disable-features=VizDisplayCompositor")
+            chrome_options.add_argument("--proxy-bypass-list=localhost,127.0.0.1")
+            chrome_options.add_argument("--disable-popup-blocking")
+            chrome_options.add_argument("--disable-extensions-http-throttling")
+        
         # Use direct path to Chrome on Mac
         if os.path.exists("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"):
             chrome_options.binary_location = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
         
         print(f"Setting up ChromeDriver with options: {chrome_options}")
+        print(f"Proxy configuration: {proxy}")
         try:
             # Use standard ChromeDriverManager
             print("Installing ChromeDriver")

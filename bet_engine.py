@@ -16,6 +16,7 @@ from utils.calculate_no_vig_prices import calculate_no_vig_prices
 from utils.calculate_ev import calculate_ev
 from scipy.optimize import minimize_scalar
 import math
+from captcha_solver import CaptchaSolver
 
 dotenv.load_dotenv()
 
@@ -100,13 +101,83 @@ class BetEngine(WebsiteOpener):
         self.__setup_accounts()
         self.__start_bet_worker()
         
-    def _initialize_browser_if_needed(self):
-        """Initialize the browser if it hasn't been initialized yet"""
+    def _initialize_browser_if_needed(self, account=None):
+        """Initialize the browser if it hasn't been initialized yet
+        
+        Parameters:
+        - account: Specific BetAccount to use for proxy configuration. If None, uses first available proxy.
+        """
+        # Check if we need to reinitialize browser for a different proxy
+        current_proxy = getattr(self, '_current_proxy', None)
+        target_proxy = None
+        
+        if self.__config.get("use_proxies", False):
+            if account and account.proxy:
+                target_proxy = account.proxy
+            else:
+                # Fallback to first available proxy
+                for acc in self.__accounts:
+                    if acc.proxy:
+                        target_proxy = acc.proxy
+                        break
+        
+        # If browser is initialized but we need a different proxy, clean up first
+        if (self.__browser_initialized and 
+            current_proxy != target_proxy and 
+            self.__config.get("use_proxies", False)):
+            print(f"Proxy change detected: {current_proxy} -> {target_proxy}")
+            print("Cleaning up browser to switch proxy...")
+            self._cleanup_browser_for_proxy_switch()
+        
         if not self.__browser_initialized:
-            super().__init__(self.__headless)
+            print("Initializing browser...")
+            
+            # Get proxy from the specified account or first available account if configured
+            proxy = target_proxy
+            if proxy:
+                print(f"Using proxy: {proxy}")
+                if account:
+                    print(f"  └─ From account: {account.username}")
+                else:
+                    print(f"  └─ From fallback account")
+            else:
+                if self.__config.get("use_proxies", False):
+                    print("Proxy usage enabled but no proxy found in accounts")
+                else:
+                    print("Proxy usage disabled in config")
+            
+            super().__init__(self.__headless, proxy)
             self.__browser_initialized = True
             self.__browser_open = True
+            self._current_proxy = proxy  # Store current proxy for future comparison
             print("Browser initialized")
+            
+            # Check IP address if using proxy
+            if proxy:
+                proxy_dict = {'http': proxy, 'https': proxy}
+                self.__check_ip_address(using_proxy=True, proxy_url=proxy_dict, account=account)
+            else:
+                self.__check_ip_address(using_proxy=False)
+    
+    def _cleanup_browser_for_proxy_switch(self):
+        """Clean up the current browser instance to allow for proxy switching"""
+        try:
+            if hasattr(self, 'driver') and self.driver:
+                print("Closing current browser for proxy switch...")
+                self.driver.quit()
+                self.driver = None
+            
+            self.__browser_initialized = False
+            self.__browser_open = False
+            self._current_proxy = None
+            print("Browser cleanup completed")
+            
+        except Exception as e:
+            print(f"Error during browser cleanup: {e}")
+            # Force reset the flags even if cleanup failed
+            self.__browser_initialized = False
+            self.__browser_open = False
+            self._current_proxy = None
         
     def __load_config(self, config_file):
         """Load configuration from JSON file"""
@@ -357,22 +428,58 @@ class BetEngine(WebsiteOpener):
             raise ValueError("MSport username or password not found for account")
         
         try:
-            # Initialize browser if needed
-            self._initialize_browser_if_needed()
+            # Initialize browser with account-specific proxy
+            self._initialize_browser_if_needed(account)
+            
+            # Initialize CAPTCHA solver
+            captcha_config = self.__config.get("captcha", {})
+            if captcha_config.get("enabled", True):
+                captcha_solver = CaptchaSolver(api_key=captcha_config.get("api_key"))
+                captcha_solver.max_retries = captcha_config.get("max_retries", 3)
+            else:
+                print("⚠️  CAPTCHA solving is disabled in configuration")
+                captcha_solver = None
             
             # Navigate to MSport login page
             login_url = f"{self.__bet_host}"
             self.driver.get(login_url)
-            time.sleep(2)
+            # time.sleep(3)  # Give page time to load
+            print(f"Navigated to login page: {login_url}")
+            
+            # Check and solve CAPTCHA if present
+            # if captcha_solver:
+            #     print("🔍 Checking for Cloudflare Turnstile CAPTCHA...")
+            #     captcha_solved = captcha_solver.solve_turnstile_captcha(
+            #         driver=self.driver,
+            #         page_url=login_url,
+            #         max_retries=captcha_config.get("max_retries", 3)
+            #     )
+                
+            #     if not captcha_solved:
+            #         print("❌ Failed to solve CAPTCHA, login cannot proceed")
+            #         raise Exception("CAPTCHA solving failed")
+                
+            #     # Wait for CAPTCHA completion and page to be ready
+            #     if not captcha_solver.wait_for_captcha_completion(self.driver, timeout=captcha_config.get("timeout", 30)):
+            #         print("❌ CAPTCHA completion timeout")
+            #         raise Exception("CAPTCHA completion timeout")
+            # else:
+            #     print("⚠️  CAPTCHA solver disabled - proceeding without CAPTCHA handling")
+            #     # Just wait a bit for page to load
+            #     time.sleep(3)
+            
+            # # Give additional time for page to stabilize after CAPTCHA
+            # time.sleep(2)
             print(f"Navigated to login page: {login_url}")
             
             # Find phone number input (based on the images provided)
+            print("🔍 Looking for login form elements...")
             phone_input = WebDriverWait(self.driver, 10).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='tel'], input[placeholder*='Mobile']"))
             )
             phone_input.clear()
             phone_input.send_keys(account.username)
-            print(f"Entered phone number: {account.username}")
+            print(f"📱 Entered phone number: {account.username}")
             
             # Find password input
             password_input = WebDriverWait(self.driver, 10).until(
@@ -380,26 +487,45 @@ class BetEngine(WebsiteOpener):
             )
             password_input.clear()
             password_input.send_keys(account.password)
-            print(f"Entered password: {account.password}")
+            print(f"🔑 Entered password")
             
             # Find and click login button
             login_button = WebDriverWait(self.driver, 10).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "button[type='submit'], .v-button.btn.login.popper-input-button"))
             )
             login_button.click()
-            print(f"Clicked login button")
+            print(f"🚀 Clicked login button")
             
-            # Wait for login to complete
-            time.sleep(5)
+            # Check for additional CAPTCHA after login attempt
+            time.sleep(10)
+            if captcha_solver:
+                print("🔍 Checking for post-login CAPTCHA...")
+                post_login_captcha_solved = captcha_solver.solve_turnstile_captcha(
+                    driver=self.driver,
+                    page_url=self.driver.current_url,
+                    max_retries=captcha_config.get("max_retries", 3)
+                )
+                
+                if not post_login_captcha_solved:
+                    print("❌ Failed to solve post-login CAPTCHA")
+                    # Don't fail completely - sometimes login works despite CAPTCHA issues
+                    print("⚠️  Continuing despite post-login CAPTCHA issues...")
+            else:
+                print("⚠️  CAPTCHA solver disabled - skipping post-login CAPTCHA check")
             
-            # Take screenshot of error state
+            # Wait for login to complete (reduced from 1000 seconds!)
+            print("⏳ Waiting for login completion...")
+            time.sleep(5000)
+            
+            # Take screenshot for debugging
             try:
                 timestamp = time.strftime("%Y%m%d-%H%M%S")
-                screenshot_path = f"logindone_{timestamp}.png"
+                screenshot_path = f"login_status_{timestamp}.png"
                 self.driver.save_screenshot(screenshot_path)
-                print(f"Error screenshot saved to {screenshot_path}")
+                print(f"📸 Login status screenshot saved to {screenshot_path}")
             except Exception as screenshot_error:
-                print(f"Failed to take error screenshot: {screenshot_error}")
+                print(f"Failed to take screenshot: {screenshot_error}")
+            
             # Check if login was successful by looking for user profile or betting interface
             try:
                 # Look for elements that indicate successful login
@@ -432,7 +558,7 @@ class BetEngine(WebsiteOpener):
                 raise Exception("Login verification timeout")
                 
         except Exception as e:
-            print(f"Login failed for account: {account.username}: {e}")
+            print(f"❌ Login failed for account: {account.username}: {e}")
             raise
 
     def __search_event(self, home_team, away_team, pinnacle_start_time=None):
@@ -687,7 +813,8 @@ class BetEngine(WebsiteOpener):
         - True if bet was placed successfully, False otherwise
         """
         try:
-            self._initialize_browser_if_needed()
+            # Initialize browser with account-specific proxy
+            self._initialize_browser_if_needed(account)
 
             try:
                 timestamp = time.strftime("%Y%m%d-%H%M%S")
@@ -2345,7 +2472,7 @@ class BetEngine(WebsiteOpener):
             print(f"\n5. Testing CSS selector system...")
             
             # Navigate to the betting page first
-            self._initialize_browser_if_needed()
+            self._initialize_browser_if_needed(test_data["accounts"][0])
             print(f"Navigating to: {bet_url}")
             self.open_url(bet_url)
             time.sleep(3)
