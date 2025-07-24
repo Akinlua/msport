@@ -92,7 +92,7 @@ class WebsiteOpener:
     def setup_driver(self, headless, proxy=None):
         """Set up the Chrome WebDriver using default profile."""
         chrome_options = Options()
-        
+         
         if headless:
             chrome_options.add_argument("--headless=new")
         
