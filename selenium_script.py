@@ -3,6 +3,9 @@
 import time
 import os
 import glob
+import zipfile
+import string
+import random
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -20,7 +23,71 @@ class WebsiteOpener:
             headless (bool): Whether to run Chrome in headless mode
             proxy (str): Proxy URL in format "http://host:port" or "http://user:pass@host:port"
         """
+        self.proxy_plugin_file = None
         self.setup_driver(headless, proxy)
+    
+    def create_proxy_auth_extension(self, proxy_host, proxy_port, proxy_user, proxy_pass):
+        """Create a Chrome extension for proxy authentication."""
+        
+        manifest_json = """
+        {
+            "version": "1.0.0",
+            "manifest_version": 2,
+            "name": "Chrome Proxy",
+            "permissions": [
+                "proxy",
+                "tabs",
+                "unlimitedStorage",
+                "storage",
+                "<all_urls>",
+                "webRequest",
+                "webRequestBlocking"
+            ],
+            "background": {
+                "scripts": ["background.js"]
+            },
+            "minimum_chrome_version":"22.0.0"
+        }
+        """
+
+        background_js = f"""
+        var config = {{
+                mode: "fixed_servers",
+                rules: {{
+                  singleProxy: {{
+                    scheme: "http",
+                    host: "{proxy_host}",
+                    port: parseInt({proxy_port})
+                  }},
+                  bypassList: ["localhost"]
+                }}
+              }};
+        chrome.proxy.settings.set({{value: config, scope: "regular"}}, function() {{}});
+        function callbackFn(details) {{
+            return {{
+                authCredentials: {{
+                    username: "{proxy_user}",
+                    password: "{proxy_pass}"
+                }}
+            }};
+        }}
+        chrome.webRequest.onAuthRequired.addListener(
+                callbackFn,
+                {{urls: ["<all_urls>"]}},
+                ['blocking']
+        );
+        """
+
+        # Generate a random filename to avoid conflicts
+        random_string = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
+        pluginfile = f'proxy_auth_plugin_{random_string}.zip'
+
+        with zipfile.ZipFile(pluginfile, 'w') as zp:
+            zp.writestr("manifest.json", manifest_json)
+            zp.writestr("background.js", background_js)
+        
+        print(f"✅ Created proxy auth extension: {pluginfile}")
+        return pluginfile
     
     def setup_driver(self, headless, proxy=None):
         """Set up the Chrome WebDriver using default profile."""
@@ -58,8 +125,8 @@ class WebsiteOpener:
         user_data_dir = os.path.join(home_dir, "Library", "Application Support", "Google", "Chrome")
         
         # Use your actual Chrome user data directory and default profile
-        chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
-        chrome_options.add_argument("--profile-directory=Default")
+        # chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
+        # chrome_options.add_argument("--profile-directory=Default")
         
         print(f"🔧 Using your actual Chrome profile: {user_data_dir}")
         print("📂 Profile: Default (your main Chrome profile)")
@@ -68,20 +135,39 @@ class WebsiteOpener:
         # Add proxy configuration if provided
         if proxy:
             print(f"Configuring proxy: {proxy}")
+            
+            # Parse proxy URL to extract components
+            import urllib.parse
             if proxy.startswith("http://") or proxy.startswith("https://"):
-                proxy_url = proxy
+                parsed_proxy = urllib.parse.urlparse(proxy)
+                
+                if parsed_proxy.username and parsed_proxy.password:
+                    # Handle authenticated proxy using Chrome extension
+                    print(f"🔐 Detected authenticated proxy")
+                    print(f"Host: {parsed_proxy.hostname}:{parsed_proxy.port}")
+                    print(f"Username: {parsed_proxy.username}")
+                    
+                    # Create proxy authentication extension
+                    self.proxy_plugin_file = self.create_proxy_auth_extension(
+                        proxy_host=parsed_proxy.hostname,
+                        proxy_port=parsed_proxy.port,
+                        proxy_user=parsed_proxy.username,
+                        proxy_pass=parsed_proxy.password
+                    )
+                    
+                    # Add the extension to Chrome
+                    chrome_options.add_extension(self.proxy_plugin_file)
+                    print(f"✅ Added proxy auth extension to Chrome")
+                    
+                else:
+                    # Simple proxy without authentication
+                    proxy_url = proxy
+                    chrome_options.add_argument(f"--proxy-server={proxy_url}")
+                    print(f"✅ Added simple proxy: {proxy_url}")
             else:
                 proxy_url = f"http://{proxy}"
-            
-            chrome_options.add_argument(f"--proxy-server={proxy_url}")
-            print(f"Added proxy argument: --proxy-server={proxy_url}")
-            
-            # Add arguments to handle proxy authentication
-            # chrome_options.add_argument("--disable-web-security")
-            # chrome_options.add_argument("--disable-features=VizDisplayCompositor")
-            # chrome_options.add_argument("--proxy-bypass-list=localhost,127.0.0.1")
-            # chrome_options.add_argument("--disable-popup-blocking")
-            # chrome_options.add_argument("--disable-extensions-http-throttling")
+                chrome_options.add_argument(f"--proxy-server={proxy_url}")
+                print(f"Added proxy argument: --proxy-server={proxy_url}")
         
         # Use direct path to Chrome on Mac
         if os.path.exists("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"):
@@ -93,7 +179,7 @@ class WebsiteOpener:
         try:
             # Method 1: Try with system chromedriver first (avoid ChromeDriverManager issues)
             print("🔧 Trying system chromedriver...")
-            self.driver = webdriver.Chrome(options=chrome_options, service=Service(r'C:\Users\Administrator\Downloads\chromedriver-win64\chromedriver-win64\chromedriver.exe'))
+            self.driver = webdriver.Chrome(options=chrome_options)
             print("✅ Chrome started with system chromedriver!")
             print("👀 You should see all your bookmarks, extensions, and saved data!")
             
@@ -157,6 +243,10 @@ class WebsiteOpener:
                     if chrome_options.binary_location:
                         fallback_options.binary_location = chrome_options.binary_location
                     
+                    # Add proxy extension to fallback options if it exists
+                    if self.proxy_plugin_file:
+                        fallback_options.add_extension(self.proxy_plugin_file)
+                    
                     self.driver = webdriver.Chrome(options=fallback_options)
                     print("⚠️  Chrome started without custom profile (using default temporary profile)")
                     print("   Your bookmarks and extensions may not be available")
@@ -164,6 +254,33 @@ class WebsiteOpener:
                 except Exception as e3:
                     print(f"All methods failed: {e3}")
                     raise Exception(f"Could not start Chrome. Last error: {e3}")
+    
+    def test_proxy_ip(self):
+        """Test if the proxy is working by checking the IP address."""
+        try:
+            # Navigate to IP checking service
+            self.driver.get("https://ipinfo.io/json")
+            
+            # Wait for page to load
+            time.sleep(3)
+            
+            # Get the page source and extract IP info
+            page_source = self.driver.page_source
+            print("🌐 IP Check Result:")
+            print(page_source)
+            
+            # Try to find IP in the page
+            if "156.252.228.152" in page_source:
+                print("✅ Proxy is working! Using expected IP: 156.252.228.152")
+                return True
+            else:
+                print("❌ Proxy may not be working properly.")
+                print("Check the page content above to see the actual IP.")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Error testing proxy: {e}")
+            return False
         
     def open_url(self, url):
         """
@@ -184,6 +301,14 @@ class WebsiteOpener:
         """Close the browser and clean up resources."""
         if hasattr(self, 'driver'):
             self.driver.quit()
+        
+        # Clean up proxy plugin file
+        if self.proxy_plugin_file and os.path.exists(self.proxy_plugin_file):
+            try:
+                os.remove(self.proxy_plugin_file)
+                print(f"🧹 Cleaned up proxy plugin: {self.proxy_plugin_file}")
+            except:
+                pass
 
     def close_browser(self):
         """Close the browser if it's open"""
@@ -195,21 +320,40 @@ class WebsiteOpener:
                 print("WebDriver closed successfully")
             except Exception as e:
                 print(f"Error closing WebDriver: {e}")
+        
+        # Clean up proxy plugin file
+        if self.proxy_plugin_file and os.path.exists(self.proxy_plugin_file):
+            try:
+                os.remove(self.proxy_plugin_file)
+                print(f"🧹 Cleaned up proxy plugin: {self.proxy_plugin_file}")
+            except:
+                pass
 
 
 def main():
-    """Main function to demonstrate usage."""
-    # Example URL
-    url = "https://www.example.com"
+    """Main function to demonstrate usage with proxy testing."""
+    # Test with your actual proxy
+    proxy_url = "http://brd-customer-hl_1b6b5179-zone-datacenter_proxy1-ip-156.252.228.152:qh13e50d5n6f@brd.superproxy.io:33335"
     
-    # Create an instance of WebsiteOpener with default profile
-    opener = WebsiteOpener(headless=False)
+    # Create an instance of WebsiteOpener with proxy
+    print("🚀 Starting Chrome with authenticated proxy...")
+    opener = WebsiteOpener(headless=False, proxy=proxy_url)
     
-    # Open the URL
-    opener.open_url(url)
+    # Test the proxy IP
+    print("\n🧪 Testing proxy functionality...")
+    proxy_working = opener.test_proxy_ip()
     
-    # Wait for a few seconds to view the page
-    time.sleep(3)
+    if proxy_working:
+        print("\n✅ Proxy test successful! Opening MSport...")
+        # Open MSport to test actual functionality
+        opener.open_url("https://www.msport.com")
+    else:
+        print("\n⚠️  Continuing anyway...")
+        opener.open_url("https://www.example.com")
+    
+    # Wait for user to see the result
+    print("\n⏳ Waiting 10 seconds for you to check the browser...")
+    time.sleep(10)
     
     # Close the browser
     opener.close()

@@ -1,6 +1,6 @@
 import requests
 url = 'https://ip.decodo.com/json'
-proxy = "http://156.228.104.89:3129"
+proxy = "http://brd-customer-hl_1b6b5179-zone-datacenter_proxy1-ip-156.252.228.152:qh13e50d5n6f@brd.superproxy.io:33335"
 
 result = requests.get(url, proxies = {
     'http': proxy,

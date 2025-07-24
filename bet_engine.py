@@ -515,7 +515,7 @@ class BetEngine(WebsiteOpener):
             
             # Wait for login to complete (reduced from 1000 seconds!)
             print("⏳ Waiting for login completion...")
-            time.sleep(5000)
+            time.sleep(5)
             
             # Take screenshot for debugging
             try:
@@ -525,6 +525,9 @@ class BetEngine(WebsiteOpener):
                 print(f"📸 Login status screenshot saved to {screenshot_path}")
             except Exception as screenshot_error:
                 print(f"Failed to take screenshot: {screenshot_error}")
+
+            time.sleep(5000)
+            
             
             # Check if login was successful by looking for user profile or betting interface
             try:
