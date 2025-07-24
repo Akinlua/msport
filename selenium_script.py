@@ -24,6 +24,7 @@ class WebsiteOpener:
             proxy (str): Proxy URL in format "http://host:port" or "http://user:pass@host:port"
         """
         self.proxy_plugin_file = None
+        self.temp_user_data_dir = None
         self.setup_driver(headless, proxy)
     
     def create_proxy_auth_extension(self, proxy_host, proxy_port, proxy_user, proxy_pass):
@@ -106,6 +107,21 @@ class WebsiteOpener:
         # chrome_options.add_experimental_option('useAutomationExtension', False)
         # chrome_options.add_argument("--disable-blink-features=AutomationControlled")
         
+        # Force Chrome to NOT use any existing user data directory
+        chrome_options.add_argument("--no-first-run")
+        chrome_options.add_argument("--no-default-browser-check")
+        chrome_options.add_argument("--disable-default-apps")
+        
+        # Create a unique temporary user data directory to avoid conflicts
+        import tempfile
+        import time
+        temp_user_data_dir = tempfile.mkdtemp(prefix=f"chrome_profile_{int(time.time())}_")
+        chrome_options.add_argument(f"--user-data-dir={temp_user_data_dir}")
+        print(f"🔧 Using temporary user data dir: {temp_user_data_dir}")
+        
+        # Store for cleanup later
+        self.temp_user_data_dir = temp_user_data_dir
+        
         # Additional arguments to fix DevToolsActivePort issues
         # chrome_options.add_argument("--remote-debugging-port=0")  # Use random available port
         # # chrome_options.add_argument("--disable-extensions")  # Allow extensions to work
@@ -122,7 +138,7 @@ class WebsiteOpener:
         import os
         
         home_dir = os.path.expanduser("~")
-        user_data_dir = os.path.join(home_dir, "Library", "Application Support", "Google", "Chrome")
+        # user_data_dir = os.path.join(home_dir, "Library", "Application Support", "Google", "Chrome")
         
         # Use your actual Chrome user data directory and default profile
         # chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
@@ -309,6 +325,15 @@ class WebsiteOpener:
             except:
                 pass
 
+        # Clean up temporary user data directory
+        if hasattr(self, 'temp_user_data_dir') and os.path.exists(self.temp_user_data_dir):
+            try:
+                import shutil
+                shutil.rmtree(self.temp_user_data_dir)
+                print(f"🧹 Cleaned up temporary user data dir: {self.temp_user_data_dir}")
+            except:
+                pass
+
     def close_browser(self):
         """Close the browser if it's open"""
         if hasattr(self, 'driver') and self.driver:
@@ -325,6 +350,15 @@ class WebsiteOpener:
             try:
                 os.remove(self.proxy_plugin_file)
                 print(f"🧹 Cleaned up proxy plugin: {self.proxy_plugin_file}")
+            except:
+                pass
+
+        # Clean up temporary user data directory
+        if hasattr(self, 'temp_user_data_dir') and os.path.exists(self.temp_user_data_dir):
+            try:
+                import shutil
+                shutil.rmtree(self.temp_user_data_dir)
+                print(f"🧹 Cleaned up temporary user data dir: {self.temp_user_data_dir}")
             except:
                 pass
 
