@@ -128,9 +128,9 @@ class WebsiteOpener:
         # chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
         # chrome_options.add_argument("--profile-directory=Default")
         
-        print(f"🔧 Using your actual Chrome profile: {user_data_dir}")
-        print("📂 Profile: Default (your main Chrome profile)")
-        print("✅ This will load all your bookmarks, extensions, and saved data!")
+        print(f"🔧 Setting up Chrome with clean profile (no user data conflicts)")
+        print("📂 Profile: Temporary profile (clean startup)")
+        print("✅ This avoids profile lock issues on servers!")
         
         # Add proxy configuration if provided
         if proxy:
@@ -230,22 +230,21 @@ class WebsiteOpener:
                 # Method 3: Try without specifying service path at all
                 try:
                     print("🔧 Trying default Chrome service...")
-                    # Remove user-data-dir temporarily to avoid profile conflicts
+                    # Create completely clean fallback options without any profile settings
                     fallback_options = Options()
-                    # for arg in chrome_options.arguments:
-                    #     if not arg.startswith('--user-data-dir') and not arg.startswith('--profile-directory'):
-                    #         fallback_options.add_argument(arg)
                     
-                    # Copy experimental options
-                    for key, value in chrome_options.experimental_options.items():
-                        fallback_options.add_experimental_option(key, value)
-                    
-                    if chrome_options.binary_location:
-                        fallback_options.binary_location = chrome_options.binary_location
+                    # Add only basic options, no profile-related settings
+                    fallback_options.add_argument("--window-size=1920,1080")
+                    fallback_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36")
                     
                     # Add proxy extension to fallback options if it exists
                     if self.proxy_plugin_file:
                         fallback_options.add_extension(self.proxy_plugin_file)
+                        print("✅ Added proxy extension to fallback Chrome")
+                    
+                    # Use direct path to Chrome on Mac (if applicable)
+                    if os.path.exists("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"):
+                        fallback_options.binary_location = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
                     
                     self.driver = webdriver.Chrome(options=fallback_options)
                     print("⚠️  Chrome started without custom profile (using default temporary profile)")
