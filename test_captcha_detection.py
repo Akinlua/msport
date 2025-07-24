@@ -158,7 +158,6 @@ def start_chrome_with_debugging():
     chrome_args = [
         chrome_path,
         "--remote-debugging-port=9222",
-        "--user-data-dir=/tmp/chrome-selenium",
         "--no-first-run",
         "--no-default-browser-check"
     ]

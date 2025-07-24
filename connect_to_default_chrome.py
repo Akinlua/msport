@@ -34,7 +34,6 @@ def start_chrome_with_default_profile():
     chrome_args = [
         chrome_path,
         f"--remote-debugging-port={debug_port}",
-        f"--user-data-dir={default_profile}",  # Use your default profile
         "--no-first-run",
         "--no-default-browser-check",
         "https://www.msport.com/ng/web/welcome"

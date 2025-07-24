@@ -31,7 +31,6 @@ def start_chrome_with_debugging():
         chrome_path,
         f"--remote-debugging-port={debug_port}",
         # Use default profile instead of temporary one
-        # "--user-data-dir=/tmp/chrome-selenium",  # Separate profile
         "--no-first-run",
         "--no-default-browser-check",
         "--disable-default-apps",

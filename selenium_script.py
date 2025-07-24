@@ -115,12 +115,6 @@ class WebsiteOpener:
         # Create a unique temporary user data directory to avoid conflicts
         import tempfile
         import time
-        temp_user_data_dir = tempfile.mkdtemp(prefix=f"chrome_profile_{int(time.time())}_")
-        chrome_options.add_argument(f"--user-data-dir={temp_user_data_dir}")
-        print(f"🔧 Using temporary user data dir: {temp_user_data_dir}")
-        
-        # Store for cleanup later
-        self.temp_user_data_dir = temp_user_data_dir
         
         # Additional arguments to fix DevToolsActivePort issues
         # chrome_options.add_argument("--remote-debugging-port=0")  # Use random available port
@@ -138,12 +132,6 @@ class WebsiteOpener:
         import os
         
         home_dir = os.path.expanduser("~")
-        # user_data_dir = os.path.join(home_dir, "Library", "Application Support", "Google", "Chrome")
-        
-        # Use your actual Chrome user data directory and default profile
-        # chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
-        # chrome_options.add_argument("--profile-directory=Default")
-        
         print(f"🔧 Setting up Chrome with clean profile (no user data conflicts)")
         print("📂 Profile: Temporary profile (clean startup)")
         print("✅ This avoids profile lock issues on servers!")

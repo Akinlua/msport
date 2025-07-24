@@ -75,12 +75,6 @@ class WebsiteOpener:
         import os
         
         home_dir = os.path.expanduser("~")
-        user_data_dir = os.path.join(home_dir, "Library", "Application Support", "Google", "Chrome")
-        
-        # Use your actual Chrome user data directory and default profile
-        # options.add_argument(f"--user-data-dir={user_data_dir}")
-        # options.add_argument("--profile-directory=Default")
-        
         print(f"🔧 Using your actual Chrome profile with stealth mode: {user_data_dir}")
         print("📂 Profile: Default (your main Chrome profile)")
         print("🥷 Enhanced stealth mode enabled to avoid bot detection!")
@@ -147,9 +141,6 @@ class WebsiteOpener:
                 chrome_options.add_argument("--remote-debugging-port=0")
                 chrome_options.add_argument(f"--user-agent={selected_ua}")
                 
-                # # Profile settings
-                # chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
-                # chrome_options.add_argument("--profile-directory=Default")
                 
                 # Proxy settings
                 if proxy:
