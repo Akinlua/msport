@@ -232,9 +232,9 @@ class WebsiteOpener:
                     print("🔧 Trying default Chrome service...")
                     # Remove user-data-dir temporarily to avoid profile conflicts
                     fallback_options = Options()
-                    for arg in chrome_options.arguments:
-                        if not arg.startswith('--user-data-dir') and not arg.startswith('--profile-directory'):
-                            fallback_options.add_argument(arg)
+                    # for arg in chrome_options.arguments:
+                    #     if not arg.startswith('--user-data-dir') and not arg.startswith('--profile-directory'):
+                    #         fallback_options.add_argument(arg)
                     
                     # Copy experimental options
                     for key, value in chrome_options.experimental_options.items():
