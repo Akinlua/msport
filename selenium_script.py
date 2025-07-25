@@ -2,6 +2,7 @@
 
 import time
 import os
+import tempfile
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -19,6 +20,7 @@ class WebsiteOpener:
             headless (bool): Whether to run Chrome in headless mode
             proxy (str): Proxy URL in format "http://host:port"
         """
+        self.temp_user_data_dir = None
         self.setup_driver(headless, proxy)
     
     def setup_driver(self, headless, proxy=None):
@@ -27,6 +29,11 @@ class WebsiteOpener:
          
         if headless:
             chrome_options.add_argument("--headless=new")
+        
+        # Create temporary user data directory to avoid conflicts
+        self.temp_user_data_dir = tempfile.mkdtemp(prefix="chrome-profile-")
+        chrome_options.add_argument(f"--user-data-dir={self.temp_user_data_dir}")
+        print(f"✅ Using temporary profile: {self.temp_user_data_dir}")
         
         # Basic options
         chrome_options.add_argument("--window-size=1920,1080")
@@ -103,6 +110,15 @@ class WebsiteOpener:
         """Close the browser and clean up resources."""
         if hasattr(self, 'driver'):
             self.driver.quit()
+        
+        # Clean up temporary user data directory
+        if self.temp_user_data_dir and os.path.exists(self.temp_user_data_dir):
+            try:
+                import shutil
+                shutil.rmtree(self.temp_user_data_dir)
+                print(f"🧹 Cleaned up temporary profile: {self.temp_user_data_dir}")
+            except Exception as e:
+                print(f"⚠️  Could not clean up temp directory: {e}")
 
     def close_browser(self):
         """Close the browser if it's open"""
@@ -114,6 +130,15 @@ class WebsiteOpener:
                 print("WebDriver closed successfully")
             except Exception as e:
                 print(f"Error closing WebDriver: {e}")
+        
+        # Clean up temporary user data directory
+        if self.temp_user_data_dir and os.path.exists(self.temp_user_data_dir):
+            try:
+                import shutil
+                shutil.rmtree(self.temp_user_data_dir)
+                print(f"🧹 Cleaned up temporary profile: {self.temp_user_data_dir}")
+            except Exception as e:
+                print(f"⚠️  Could not clean up temp directory: {e}")
 
 
 def main():
