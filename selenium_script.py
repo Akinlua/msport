@@ -136,6 +136,11 @@ class WebsiteOpener:
         chrome_options.add_argument("--disable-extensions")
         chrome_options.add_argument("--disable-plugins")
         chrome_options.add_argument("--single-process")  # Helps on servers
+
+        chrome_options.add_argument("--disable-features=VizDisplayCompositor")
+        chrome_options.add_argument("--disable-features=NetworkServiceInProcess")
+        chrome_options.add_argument("--disable-features=AudioServiceOutOfProcess")
+
         chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36")
         
         # Simple proxy configuration
