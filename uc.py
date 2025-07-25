@@ -22,6 +22,7 @@ class WebsiteOpener:
             headless (bool): Whether to run Chrome in headless mode
             proxy (str): Proxy URL in format "http://host:port" or "http://user:pass@host:port"
         """
+        self.temp_user_data_dir = None
         self.setup_driver(headless, proxy)
     
     def setup_driver(self, headless, proxy=None):
@@ -71,12 +72,13 @@ class WebsiteOpener:
         selected_ua = random.choice(user_agents)
         options.add_argument(f"--user-agent={selected_ua}")
         
-        # Use your actual default Chrome profile directly
-        import os
+        # Create temporary user data directory to avoid conflicts
+        import tempfile
+        self.temp_user_data_dir = tempfile.mkdtemp(prefix="uc-chrome-profile-")
+        options.add_argument(f"--user-data-dir={self.temp_user_data_dir}")
         
-        home_dir = os.path.expanduser("~")
-        print(f"🔧 Using your actual Chrome profile with stealth mode: {user_data_dir}")
-        print("📂 Profile: Default (your main Chrome profile)")
+        print(f"🔧 Using temporary Chrome profile for stealth mode: {self.temp_user_data_dir}")
+        print("📂 Profile: Temporary (clean stealth profile)")
         print("🥷 Enhanced stealth mode enabled to avoid bot detection!")
         print(f"🎭 Using random user agent: {selected_ua[:50]}...")
         
@@ -286,6 +288,15 @@ class WebsiteOpener:
         """Close the browser and clean up resources."""
         if hasattr(self, 'driver'):
             self.driver.quit()
+        
+        # Clean up temporary user data directory
+        if self.temp_user_data_dir and os.path.exists(self.temp_user_data_dir):
+            try:
+                import shutil
+                shutil.rmtree(self.temp_user_data_dir)
+                print(f"🧹 Cleaned up temporary uc profile: {self.temp_user_data_dir}")
+            except Exception as e:
+                print(f"⚠️  Could not clean up uc temp directory: {e}")
 
     def close_browser(self):
         """Close the browser if it's open"""
@@ -297,6 +308,15 @@ class WebsiteOpener:
                 print("WebDriver closed successfully")
             except Exception as e:
                 print(f"Error closing WebDriver: {e}")
+        
+        # Clean up temporary user data directory
+        if self.temp_user_data_dir and os.path.exists(self.temp_user_data_dir):
+            try:
+                import shutil
+                shutil.rmtree(self.temp_user_data_dir)
+                print(f"🧹 Cleaned up temporary uc profile: {self.temp_user_data_dir}")
+            except Exception as e:
+                print(f"⚠️  Could not clean up uc temp directory: {e}")
 
 
 def main():
