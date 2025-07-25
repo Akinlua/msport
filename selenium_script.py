@@ -52,7 +52,8 @@ class WebsiteOpener:
         try:
             # Try with ChromeDriverManager
             self.driver = webdriver.Chrome(
-                service=Service(ChromeDriverManager().install()),
+                # service=Service(ChromeDriverManager().install()),
+                service=Service("/usr/local/bin/chromedriver"),
                 options=chrome_options
             )
             print("✅ Chrome started successfully!")
