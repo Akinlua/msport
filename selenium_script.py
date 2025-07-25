@@ -106,10 +106,10 @@ class WebsiteOpener:
         """Set up the Chrome WebDriver with enhanced conflict resolution."""
         
         # Kill any existing Chrome processes first
-        self.kill_existing_chrome_processes()
+        # self.kill_existing_chrome_processes()
         
-        # Clean up old temp directories
-        self.cleanup_old_temp_dirs()
+        # # Clean up old temp directories
+        # self.cleanup_old_temp_dirs()
         
         chrome_options = Options()
          
