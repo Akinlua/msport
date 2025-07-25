@@ -123,23 +123,23 @@ class WebsiteOpener:
         
         # Enhanced options for server stability
         chrome_options.add_argument("--window-size=1920,1080")
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--disable-software-rasterizer")
-        chrome_options.add_argument("--disable-background-timer-throttling")
-        chrome_options.add_argument("--disable-backgrounding-occluded-windows")
-        chrome_options.add_argument("--disable-renderer-backgrounding")
-        chrome_options.add_argument("--no-first-run")
-        chrome_options.add_argument("--no-default-browser-check")
-        chrome_options.add_argument("--disable-default-apps")
-        chrome_options.add_argument("--disable-extensions")
-        chrome_options.add_argument("--disable-plugins")
-        chrome_options.add_argument("--single-process")  # Helps on servers
+        # chrome_options.add_argument("--no-sandbox")
+        # chrome_options.add_argument("--disable-dev-shm-usage")
+        # chrome_options.add_argument("--disable-gpu")
+        # chrome_options.add_argument("--disable-software-rasterizer")
+        # chrome_options.add_argument("--disable-background-timer-throttling")
+        # chrome_options.add_argument("--disable-backgrounding-occluded-windows")
+        # chrome_options.add_argument("--disable-renderer-backgrounding")
+        # chrome_options.add_argument("--no-first-run")
+        # chrome_options.add_argument("--no-default-browser-check")
+        # chrome_options.add_argument("--disable-default-apps")
+        # chrome_options.add_argument("--disable-extensions")
+        # chrome_options.add_argument("--disable-plugins")
+        # chrome_options.add_argument("--single-process")  # Helps on servers
 
-        chrome_options.add_argument("--disable-features=VizDisplayCompositor")
-        chrome_options.add_argument("--disable-features=NetworkServiceInProcess")
-        chrome_options.add_argument("--disable-features=AudioServiceOutOfProcess")
+        # chrome_options.add_argument("--disable-features=VizDisplayCompositor")
+        # chrome_options.add_argument("--disable-features=NetworkServiceInProcess")
+        # chrome_options.add_argument("--disable-features=AudioServiceOutOfProcess")
 
         chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36")
         
