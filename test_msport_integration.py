@@ -59,8 +59,8 @@ def test_event_search():
     
     try:
         # Test search with sample teams
-        home_team = "Besiktas"
-        away_team = "Shakhtar Donetsk"
+        home_team = "CFR Cluj"
+        away_team = "Champions FC Arges"
         
         print(f"Searching for event: {home_team} vs {away_team}")
         event_id = bet_engine.search_event(home_team, away_team)
@@ -161,8 +161,8 @@ def test_bet_placement():
         # Test data similar to what would come from Pinnacle
         test_shaped_data = {
             "game": {
-                "away": "Shakhtar Donetsk",
-                "home": "Besiktas"
+                "away": "Champions FC Arges",
+                "home": "CFR Cluj"
             },
             "category": {
                 "type": "money_line",
@@ -206,9 +206,9 @@ def test_direct_bet_placement():
     
     try:
         # Step 1: Search for a real event
-        home_team = "Besiktas"
-        away_team = "Shakhtar Donetsk"
-        
+        home_team = "CFR Cluj"
+        away_team = "Champions FC Arges"
+
         print(f"Searching for event: {home_team} vs {away_team}")
         event_id = bet_engine.search_event(home_team, away_team)
         
@@ -361,13 +361,13 @@ def test_url_generation():
     try:
         # Sample event details
         event_details = {
-            "homeTeam": "Besiktas",
-            "awayTeam": "Shakhtar Donetsk",
+            "homeTeam": "CFR Cluj",
+            "awayTeam": "Champions FC Arges",
             "eventId": "sr:match:58052699"
         }
         
         url = bet_engine.generate_msport_bet_url(event_details)
-        expected_pattern = "Besiktas/Shakhtar_Donetsk/sr:match:58052699"
+        expected_pattern = "CFR_Cluj/Champions_FC_Arges/sr:match:58052699"
         
         print(f"Generated URL: {url}")
         
