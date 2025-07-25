@@ -6,6 +6,7 @@ import glob
 import zipfile
 import string
 import random
+import json # Added for json.dumps
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -30,11 +31,10 @@ class WebsiteOpener:
     def create_proxy_auth_extension(self, proxy_host, proxy_port, proxy_user, proxy_pass):
         """Create a Chrome extension for proxy authentication."""
         
-        manifest_json = """
-        {
+        manifest_json = {
             "version": "1.0.0",
             "manifest_version": 2,
-            "name": "Chrome Proxy",
+            "name": "Chrome Proxy Auth",
             "permissions": [
                 "proxy",
                 "tabs",
@@ -45,49 +45,76 @@ class WebsiteOpener:
                 "webRequestBlocking"
             ],
             "background": {
-                "scripts": ["background.js"]
+                "scripts": ["background.js"],
+                "persistent": True
             },
-            "minimum_chrome_version":"22.0.0"
+            "minimum_chrome_version": "22.0.0"
         }
-        """
 
         background_js = f"""
-        var config = {{
-                mode: "fixed_servers",
-                rules: {{
-                  singleProxy: {{
-                    scheme: "http",
-                    host: "{proxy_host}",
-                    port: parseInt({proxy_port})
-                  }},
-                  bypassList: ["localhost"]
-                }}
-              }};
-        chrome.proxy.settings.set({{value: config, scope: "regular"}}, function() {{}});
-        function callbackFn(details) {{
-            return {{
-                authCredentials: {{
-                    username: "{proxy_user}",
-                    password: "{proxy_pass}"
-                }}
-            }};
+console.log("Proxy extension starting...");
+
+// Set proxy configuration
+var config = {{
+    mode: "fixed_servers",
+    rules: {{
+        singleProxy: {{
+            scheme: "http",
+            host: "{proxy_host}",
+            port: parseInt({proxy_port})
+        }},
+        bypassList: ["localhost", "127.0.0.1"]
+    }}
+}};
+
+chrome.proxy.settings.set({{value: config, scope: "regular"}}, function() {{
+    console.log("Proxy configured:", config);
+    if (chrome.runtime.lastError) {{
+        console.error("Proxy setup error:", chrome.runtime.lastError);
+    }} else {{
+        console.log("Proxy setup successful");
+    }}
+}});
+
+// Handle authentication
+function callbackFn(details) {{
+    console.log("Auth required for:", details.url);
+    return {{
+        authCredentials: {{
+            username: "{proxy_user}",
+            password: "{proxy_pass}"
         }}
-        chrome.webRequest.onAuthRequired.addListener(
-                callbackFn,
-                {{urls: ["<all_urls>"]}},
-                ['blocking']
-        );
-        """
+    }};
+}}
+
+chrome.webRequest.onAuthRequired.addListener(
+    callbackFn,
+    {{urls: ["<all_urls>"]}},
+    ['blocking']
+);
+
+console.log("Proxy extension loaded successfully");
+"""
 
         # Generate a random filename to avoid conflicts
         random_string = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
         pluginfile = f'proxy_auth_plugin_{random_string}.zip'
 
-        with zipfile.ZipFile(pluginfile, 'w') as zp:
-            zp.writestr("manifest.json", manifest_json)
+        # Create the zip file with proper structure
+        with zipfile.ZipFile(pluginfile, 'w', zipfile.ZIP_DEFLATED) as zp:
+            zp.writestr("manifest.json", json.dumps(manifest_json, indent=2))
             zp.writestr("background.js", background_js)
         
         print(f"✅ Created proxy auth extension: {pluginfile}")
+        
+        # Verify the zip file was created correctly
+        try:
+            with zipfile.ZipFile(pluginfile, 'r') as zp:
+                files = zp.namelist()
+                print(f"📦 Extension files: {files}")
+        except Exception as e:
+            print(f"❌ Error verifying extension zip: {e}")
+        
         return pluginfile
     
     def setup_driver(self, headless, proxy=None):
@@ -112,9 +139,24 @@ class WebsiteOpener:
         chrome_options.add_argument("--no-default-browser-check")
         chrome_options.add_argument("--disable-default-apps")
         
-        # Create a unique temporary user data directory to avoid conflicts
+        # Enable extension support and logging
+        chrome_options.add_argument("--enable-logging")
+        chrome_options.add_argument("--log-level=0")  # Enable all logs
+        chrome_options.add_argument("--disable-web-security")  # Allow extension to work
+        chrome_options.add_argument("--allow-running-insecure-content")
+        chrome_options.add_argument("--disable-features=VizDisplayCompositor")
+        # DON'T disable extensions - they need to be enabled for proxy to work
+        # chrome_options.add_argument("--disable-extensions")  # COMMENTED OUT
+        
+        # Create a unique temporary user data directory - REQUIRED for proxy extensions to work
         import tempfile
         import time
+        temp_user_data_dir = tempfile.mkdtemp(prefix=f"chrome_proxy_{int(time.time())}_")
+        chrome_options.add_argument(f"--user-data-dir={temp_user_data_dir}")
+        print(f"🔧 Created temporary profile for proxy: {temp_user_data_dir}")
+        
+        # Store for cleanup later
+        self.temp_user_data_dir = temp_user_data_dir
         
         # Additional arguments to fix DevToolsActivePort issues
         # chrome_options.add_argument("--remote-debugging-port=0")  # Use random available port
@@ -258,10 +300,113 @@ class WebsiteOpener:
                     print(f"All methods failed: {e3}")
                     raise Exception(f"Could not start Chrome. Last error: {e3}")
     
+    def debug_proxy_extension(self):
+        """Debug the proxy extension to see if it's working properly."""
+        try:
+            print("🔍 Debugging proxy extension...")
+            
+            # Check Chrome console logs for extension errors
+            try:
+                logs = self.driver.get_log('browser')
+                if logs:
+                    print("📋 Chrome browser logs:")
+                    for log in logs[-10:]:  # Show last 10 logs
+                        print(f"  {log['level']}: {log['message']}")
+                else:
+                    print("📋 No browser logs found")
+            except Exception as e:
+                print(f"⚠️  Could not retrieve browser logs: {e}")
+            
+            # First, let's check if the extension is loaded
+            print("📋 Checking Chrome extensions...")
+            try:
+                # Go to chrome://extensions to check if our proxy extension is loaded
+                self.driver.get("chrome://extensions/")
+                time.sleep(2)
+                page_source = self.driver.page_source.lower()
+                if "chrome proxy" in page_source or "proxy auth" in page_source:
+                    print("✅ Proxy extension appears to be loaded")
+                else:
+                    print("❌ Proxy extension NOT found in extensions page")
+                    print("🔍 Available extensions on page:")
+                    # Try to find what extensions are actually loaded
+                    if "extensions" in page_source:
+                        print("   Extensions page loaded, but proxy extension not visible")
+                    else:
+                        print("   Could not access extensions page properly")
+            except Exception as e:
+                print(f"⚠️  Could not check extension status: {e}")
+            
+            # Execute JavaScript to check if proxy is set
+            print("🔍 Checking proxy configuration via JavaScript...")
+            proxy_check_script = """
+            var result = {};
+            try {
+                if (typeof chrome !== 'undefined' && chrome.proxy) {
+                    result.chromeProxy = 'Available';
+                    // Try to get proxy settings
+                    chrome.proxy.settings.get({}, function(config) {
+                        console.log('Proxy config:', config);
+                    });
+                } else {
+                    result.chromeProxy = 'Not available';
+                }
+                if (typeof chrome !== 'undefined' && chrome.runtime) {
+                    result.chromeRuntime = 'Available';
+                } else {
+                    result.chromeRuntime = 'Not available';
+                }
+            } catch (e) {
+                result.error = e.toString();
+            }
+            return JSON.stringify(result);
+            """
+            
+            try:
+                result = self.driver.execute_script(proxy_check_script)
+                print(f"📋 JavaScript proxy check: {result}")
+            except Exception as e:
+                print(f"⚠️  Could not execute proxy check script: {e}")
+            
+            # Check if we can access chrome://net-internals/#proxy
+            try:
+                print("🔍 Checking Chrome network internals...")
+                self.driver.get("chrome://net-internals/#proxy")
+                time.sleep(2)
+                print("✅ Accessed Chrome network internals page")
+                # Try to get proxy info from the page
+                page_text = self.driver.page_source
+                if "brd.superproxy.io" in page_text:
+                    print("✅ Found proxy server in network internals!")
+                else:
+                    print("❌ Proxy server not found in network internals")
+            except Exception as e:
+                print(f"⚠️  Could not access Chrome network internals: {e}")
+                
+        except Exception as e:
+            print(f"❌ Error debugging proxy extension: {e}")
+    
     def test_proxy_ip(self):
         """Test if the proxy is working by checking the IP address."""
         try:
+            print("🧪 Testing proxy functionality...")
+            
+            # First, let's check if the extension is loaded
+            print("📋 Checking Chrome extensions...")
+            try:
+                # Go to chrome://extensions to check if our proxy extension is loaded
+                self.driver.get("chrome://extensions/")
+                time.sleep(2)
+                page_source = self.driver.page_source.lower()
+                if "chrome proxy" in page_source or "proxy auth" in page_source:
+                    print("✅ Proxy extension appears to be loaded")
+                else:
+                    print("⚠️  Proxy extension may not be loaded properly")
+            except:
+                print("⚠️  Could not check extension status")
+            
             # Navigate to IP checking service
+            print("🌐 Checking IP address...")
             self.driver.get("https://ipinfo.io/json")
             
             # Wait for page to load
@@ -272,14 +417,27 @@ class WebsiteOpener:
             print("🌐 IP Check Result:")
             print(page_source)
             
-            # Try to find IP in the page
+            # Try to find the expected proxy IP
             if "156.252.228.152" in page_source:
-                print("✅ Proxy is working! Using expected IP: 156.252.228.152")
+                print("✅ SUCCESS! Proxy is working! Using expected IP: 156.252.228.152")
                 return True
             else:
-                print("❌ Proxy may not be working properly.")
-                print("Check the page content above to see the actual IP.")
-                return False
+                print("❌ PROXY NOT WORKING! Using local IP instead of proxy.")
+                
+                # Let's also try a different IP checking service
+                print("🔄 Trying alternative IP check...")
+                self.driver.get("https://httpbin.org/ip")
+                time.sleep(2)
+                alt_result = self.driver.page_source
+                print("Alternative IP check result:")
+                print(alt_result)
+                
+                if "156.252.228.152" in alt_result:
+                    print("✅ Proxy working on alternative service!")
+                    return True
+                else:
+                    print("❌ Proxy still not working on alternative service")
+                    return False
                 
         except Exception as e:
             print(f"❌ Error testing proxy: {e}")
@@ -360,6 +518,10 @@ def main():
     print("🚀 Starting Chrome with authenticated proxy...")
     opener = WebsiteOpener(headless=False, proxy=proxy_url)
     
+    # Debug the proxy extension first
+    print("\n🔍 Debugging proxy setup...")
+    opener.debug_proxy_extension()
+    
     # Test the proxy IP
     print("\n🧪 Testing proxy functionality...")
     proxy_working = opener.test_proxy_ip()
@@ -373,8 +535,8 @@ def main():
         opener.open_url("https://www.example.com")
     
     # Wait for user to see the result
-    print("\n⏳ Waiting 10 seconds for you to check the browser...")
-    time.sleep(10)
+    print("\n⏳ Waiting 15 seconds for you to check the browser and proxy...")
+    time.sleep(15)
     
     # Close the browser
     opener.close()
