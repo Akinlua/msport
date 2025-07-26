@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  msport-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: msport-testing
+    environment:
+      - DISPLAY=:99
+      - PYTHONUNBUFFERED=1
+      - DEBIAN_FRONTEND=noninteractive
+      # Add any environment variables needed by your application
+      - CAPTCHA_API_KEY=${CAPTCHA_API_KEY:-}
+    volumes:
+      # Mount the current directory to sync code changes
+      - .:/app
+      # Mount a volume for logs
+      - ./logs:/app/logs
+      # Mount config file (create this if it doesn't exist)
+      - ./config.json:/app/config.json:ro
+    ports:
+      # Expose port for debugging if needed
+      - "4444:4444"
+    # Add shared memory size for Chrome
+    shm_size: 2gb
+    # Add security options for Chrome in container
+    security_opt:
+      - seccomp:unconfined
+    # Set working directory
+    working_dir: /app
+    # Override default command if needed
+    command: python test_msport_integration.py
+    # Restart policy
+    restart: unless-stopped
+    # Add network mode if needed for specific networking
+    # network_mode: "host"
+
+  # Optional: Add a VNC server for debugging
+  vnc-server:
+    image: dorowu/ubuntu-desktop-lxde-vnc:focal
+    container_name: msport-vnc
+    environment:
+      - VNC_PASSWORD=msport123
+      - RESOLUTION=1920x1080
+    ports:
+      - "6080:80"  # noVNC web interface
+      - "5900:5900"  # VNC port
+    volumes:
+      - .:/workspace
+    profiles:
+      - debug  # Only start when using debug profile
+
+  # Optional: Selenium Grid Hub for scaling
+  selenium-hub:
+    image: selenium/hub:4.15.0
+    container_name: selenium-hub
+    ports:
+      - "4442:4442"
+      - "4443:4443"
+      - "4444:4444"
+    profiles:
+      - selenium-grid
+
+  # Optional: Chrome node for Selenium Grid
+  chrome-node:
+    image: selenium/node-chrome:4.15.0
+    container_name: selenium-chrome
+    depends_on:
+      - selenium-hub
+    environment:
+      - HUB_HOST=selenium-hub
+      - HUB_PORT=4444
+    shm_size: 2gb
+    profiles:
+      - selenium-grid
+
+volumes:
+  logs:
+    driver: local
+
+networks:
+  default:
+    name: msport-network 
