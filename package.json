@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "proxy-chain": "^2.5.9",
+    "selenium-webdriver": "^4.34.0"
+  }
+}
