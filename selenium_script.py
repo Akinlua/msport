@@ -31,10 +31,10 @@ class WebsiteOpener:
             chrome_options.add_argument("--headless=new")
         
         # Add additional options for stability
-        chrome_options.add_argument("--window-size=1920,1080")  # important!
-        chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--disable-dev-shm-usage')
+        chrome_options.add_argument('--disable-gpu')
+        chrome_options.add_argument('--window-size=1920,1080')
         
         # # Add unique user data directory to prevent conflicts
         # temp_dir = tempfile.gettempdir()
@@ -51,10 +51,10 @@ class WebsiteOpener:
         # chrome_options.add_argument("--single-process")
         # chrome_options.add_argument("--remote-debugging-port=0")  # Use random port
         
-        chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36")
-        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        chrome_options.add_experimental_option('useAutomationExtension', False)
-        chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+        # chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36")
+        # chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        # chrome_options.add_experimental_option('useAutomationExtension', False)
+        # chrome_options.add_argument("--disable-blink-features=AutomationControlled")
         
         # Add proxy configuration if provided
         if self.proxy:
@@ -69,13 +69,13 @@ class WebsiteOpener:
             print(f"Added proxy argument: --proxy-server={proxy_url}")
             
             # Add additional proxy-related arguments for better compatibility
-            chrome_options.add_argument("--ignore-certificate-errors")
-            chrome_options.add_argument("--ignore-ssl-errors")
-            chrome_options.add_argument("--ignore-certificate-errors-spki-list")
+            # chrome_options.add_argument("--ignore-certificate-errors")
+            # chrome_options.add_argument("--ignore-ssl-errors")
+            # chrome_options.add_argument("--ignore-certificate-errors-spki-list")
         
         # Use direct path to Chrome on Mac
-        if os.path.exists("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"):
-            chrome_options.binary_location = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+        # if os.path.exists("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"):
+        #     chrome_options.binary_location = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
         
         print(f"Setting up ChromeDriver with options: {chrome_options}")
         try:
@@ -96,7 +96,7 @@ class WebsiteOpener:
                 from selenium.webdriver.chrome.service import Service as ChromeService
                 
                 self.driver = webdriver.Chrome(
-                    service=ChromeService(),
+                    # service=ChromeService(),
                     options=chrome_options
                 )
             except Exception as e2:
