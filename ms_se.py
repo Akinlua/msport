@@ -36,6 +36,7 @@ class WebsiteOpener:
         # Create and return driver
         driver = webdriver.Chrome(options=chrome_options)
         print(f"Driver succesful: {driver}")
+        self.driver = driver
         return driver
         
     def open_url(self, url):
