@@ -29,27 +29,7 @@ class WebsiteOpener:
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--disable-gpu')
         chrome_options.add_argument('--window-size=1920,1080')
-        
-        # # Add unique user data directory to prevent conflicts
-        # temp_dir = tempfile.gettempdir()
-        # unique_id = str(uuid.uuid4())
-        # user_data_dir = os.path.join(temp_dir, f"chrome_user_data_{unique_id}")
-        # chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
-        
-        # # Additional server-friendly options
-        # chrome_options.add_argument("--disable-background-timer-throttling")
-        # chrome_options.add_argument("--disable-backgrounding-occluded-windows")
-        # chrome_options.add_argument("--disable-renderer-backgrounding")
-        # chrome_options.add_argument("--disable-features=TranslateUI")
-        # chrome_options.add_argument("--disable-ipc-flooding-protection")
-        # chrome_options.add_argument("--single-process")
-        # chrome_options.add_argument("--remote-debugging-port=0")  # Use random port
-        
-        # chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36")
-        # chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        # chrome_options.add_experimental_option('useAutomationExtension', False)
-        # chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-        
+
         # Add proxy configuration if provided
         if self.proxy:
             print(f"Configuring proxy: {self.proxy}")
@@ -62,21 +42,10 @@ class WebsiteOpener:
             chrome_options.add_argument(f"--proxy-server={proxy_url}")
             print(f"Added proxy argument: --proxy-server={proxy_url}")
             
-            # Add additional proxy-related arguments for better compatibility
-            # chrome_options.add_argument("--ignore-certificate-errors")
-            # chrome_options.add_argument("--ignore-ssl-errors")
-            # chrome_options.add_argument("--ignore-certificate-errors-spki-list")
-        
-        # Use direct path to Chrome on Mac
-        # if os.path.exists("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"):
-        #     chrome_options.binary_location = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-        
         print(f"Setting up ChromeDriver with options: {chrome_options}")
         try:
             # Use standard ChromeDriverManager
             print("Installing ChromeDriver")
-            # driver_path = ChromeDriverManager().install()
-            # print(f"Driver path: {driver_path}")
             self.driver = webdriver.Chrome(
                 # service=Service("/usr/local/bin/chromedriver"),
                 options=chrome_options
@@ -90,7 +59,6 @@ class WebsiteOpener:
                 from selenium.webdriver.chrome.service import Service as ChromeService
                 
                 self.driver = webdriver.Chrome(
-                    # service=ChromeService(),
                     options=chrome_options
                 )
             except Exception as e2:
