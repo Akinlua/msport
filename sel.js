@@ -58,6 +58,13 @@ async function loadSiteWithProxy() {
                 // Wait for page to load
                 await driver.wait(until.elementLocated(By.tagName('body')), 10000);
                 
+                // Take a screenshot
+                const screenshot = await driver.takeScreenshot();
+                const fs = require('fs');
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const filename = `screenshot-${timestamp}.png`;
+                fs.writeFileSync(filename, screenshot, 'base64');
+                console.log(`Screenshot saved as ${filename}`);
                 // Get page content
                 const pageContent = await driver.findElement(By.tagName('body')).getText();
                 console.log('Response:', pageContent);
