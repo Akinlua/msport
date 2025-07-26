@@ -2,6 +2,8 @@
 
 import time
 import os
+import tempfile
+import uuid
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -33,6 +35,22 @@ class WebsiteOpener:
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
+        
+        # Add unique user data directory to prevent conflicts
+        temp_dir = tempfile.gettempdir()
+        unique_id = str(uuid.uuid4())
+        user_data_dir = os.path.join(temp_dir, f"chrome_user_data_{unique_id}")
+        chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
+        
+        # Additional server-friendly options
+        chrome_options.add_argument("--disable-background-timer-throttling")
+        chrome_options.add_argument("--disable-backgrounding-occluded-windows")
+        chrome_options.add_argument("--disable-renderer-backgrounding")
+        chrome_options.add_argument("--disable-features=TranslateUI")
+        chrome_options.add_argument("--disable-ipc-flooding-protection")
+        chrome_options.add_argument("--single-process")
+        chrome_options.add_argument("--remote-debugging-port=0")  # Use random port
+        
         chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36")
         chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         chrome_options.add_experimental_option('useAutomationExtension', False)
