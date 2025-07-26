@@ -11,15 +11,13 @@ from webdriver_manager.chrome import ChromeDriverManager
 class WebsiteOpener:
     """A class to handle opening websites with Selenium."""
 
-    def __init__(self, headless=False, proxy=None):
+    def __init__(self, headless=False):
         """
         Initialize the WebsiteOpener.
         
         Args:
             headless (bool): Whether to run Chrome in headless mode
-            proxy (str): Proxy URL in format "host:port" or "user:pass@host:port"
         """
-        self.proxy = proxy
         self.setup_driver(headless)
     
     def setup_driver(self, headless):
@@ -37,23 +35,6 @@ class WebsiteOpener:
         chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         chrome_options.add_experimental_option('useAutomationExtension', False)
         chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-        
-        # Add proxy configuration if provided
-        if self.proxy:
-            print(f"Configuring proxy: {self.proxy}")
-            # Handle different proxy formats
-            if self.proxy.startswith("http://") or self.proxy.startswith("https://"):
-                proxy_url = self.proxy
-            else:
-                proxy_url = f"http://{self.proxy}"
-            
-            chrome_options.add_argument(f"--proxy-server={proxy_url}")
-            print(f"Added proxy argument: --proxy-server={proxy_url}")
-            
-            # Add additional proxy-related arguments for better compatibility
-            chrome_options.add_argument("--ignore-certificate-errors")
-            chrome_options.add_argument("--ignore-ssl-errors")
-            chrome_options.add_argument("--ignore-certificate-errors-spki-list")
         
         # Use direct path to Chrome on Mac
         if os.path.exists("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"):
@@ -122,11 +103,8 @@ def main():
     # Example URL
     url = "https://www.example.com"
     
-    # Example proxy (optional) - format: "host:port" or "user:pass@host:port"
-    proxy = None  # Set to your proxy if needed, e.g., "proxy.example.com:8080"
-    
     # Create an instance of WebsiteOpener
-    opener = WebsiteOpener(headless=False, proxy=proxy)
+    opener = WebsiteOpener(headless=False)
     
     # Open the URL
     opener.open_url(url)
