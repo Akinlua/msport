@@ -432,13 +432,13 @@ class BetEngine(WebsiteOpener):
             self._initialize_browser_if_needed(account)
             
             # Initialize CAPTCHA solver
-            captcha_config = self.__config.get("captcha", {})
-            if captcha_config.get("enabled", True):
-                captcha_solver = CaptchaSolver(api_key=captcha_config.get("api_key"))
-                captcha_solver.max_retries = captcha_config.get("max_retries", 3)
-            else:
-                print("⚠️  CAPTCHA solving is disabled in configuration")
-                captcha_solver = None
+            # captcha_config = self.__config.get("captcha", {})
+            # if captcha_config.get("enabled", True):
+            #     captcha_solver = CaptchaSolver(api_key=captcha_config.get("api_key"))
+            #     captcha_solver.max_retries = captcha_config.get("max_retries", 3)
+            # else:
+            #     print("⚠️  CAPTCHA solving is disabled in configuration")
+            #     captcha_solver = None
             
             # Navigate to MSport login page
             login_url = f"{self.__bet_host}"
@@ -470,7 +470,7 @@ class BetEngine(WebsiteOpener):
             
             # # Give additional time for page to stabilize after CAPTCHA
             # time.sleep(2)
-            print(f"Navigated to login page: {login_url}")
+            # print(f"Navigated to login page: {login_url}")
             
             # Find phone number input (based on the images provided)
             print("🔍 Looking for login form elements...")
@@ -497,25 +497,25 @@ class BetEngine(WebsiteOpener):
             print(f"🚀 Clicked login button")
             
             # Check for additional CAPTCHA after login attempt
-            time.sleep(10)
-            if captcha_solver:
-                print("🔍 Checking for post-login CAPTCHA...")
-                post_login_captcha_solved = captcha_solver.solve_turnstile_captcha(
-                    driver=self.driver,
-                    page_url=self.driver.current_url,
-                    max_retries=captcha_config.get("max_retries", 3)
-                )
+            # time.sleep(10)
+            # if captcha_solver:
+            #     print("🔍 Checking for post-login CAPTCHA...")
+            #     post_login_captcha_solved = captcha_solver.solve_turnstile_captcha(
+            #         driver=self.driver,
+            #         page_url=self.driver.current_url,
+            #         max_retries=captcha_config.get("max_retries", 3)
+            #     )
                 
-                if not post_login_captcha_solved:
-                    print("❌ Failed to solve post-login CAPTCHA")
-                    # Don't fail completely - sometimes login works despite CAPTCHA issues
-                    print("⚠️  Continuing despite post-login CAPTCHA issues...")
-            else:
-                print("⚠️  CAPTCHA solver disabled - skipping post-login CAPTCHA check")
+            #     if not post_login_captcha_solved:
+            #         print("❌ Failed to solve post-login CAPTCHA")
+            #         # Don't fail completely - sometimes login works despite CAPTCHA issues
+            #         print("⚠️  Continuing despite post-login CAPTCHA issues...")
+            # else:
+            #     print("⚠️  CAPTCHA solver disabled - skipping post-login CAPTCHA check")
             
             # Wait for login to complete (reduced from 1000 seconds!)
-            print("⏳ Waiting for login completion...")
-            time.sleep(5)
+            # print("⏳ Waiting for login completion...")
+            # time.sleep(5)
             
             # Take screenshot for debugging
             try:
@@ -526,7 +526,7 @@ class BetEngine(WebsiteOpener):
             except Exception as screenshot_error:
                 print(f"Failed to take screenshot: {screenshot_error}")
 
-            time.sleep(5000)
+            # time.sleep(5000)
             
             
             # Check if login was successful by looking for user profile or betting interface

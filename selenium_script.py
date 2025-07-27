@@ -31,8 +31,18 @@ class WebsiteOpener:
     
         # Add proxy if provided
         # if proxy_host and proxy_port:
-        chrome_options.add_argument('--headless=new')
-        chrome_options.add_argument(f'--proxy-server=http://ng.decodo.com:42001')
+        if headless:    
+            chrome_options.add_argument('--headless=new')
+        if self.proxy:
+            print(f"Configuring proxy: {self.proxy}")
+            # Handle different proxy formats
+            if self.proxy.startswith("http://") or self.proxy.startswith("https://"):
+                proxy_url = self.proxy
+            else:
+                proxy_url = f"http://{self.proxy}"
+            
+            chrome_options.add_argument(f"--proxy-server={proxy_url}")
+            print(f"Added proxy argument: --proxy-server={proxy_url}")
         
         # Additional options for better compatibility
         chrome_options.add_argument('--no-sandbox')
