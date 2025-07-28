@@ -34,6 +34,7 @@ class WebsiteOpener:
         if headless:    
             chrome_options.add_argument('--headless=new')
         if self.proxy:
+            print(f"Configuring proxy: {self.proxy}")
             chrome_options.add_argument(f"--proxy-server={self.proxy}")
 
         # chrome_options.add_argument('--headless=new')
