@@ -31,13 +31,13 @@ class WebsiteOpener:
     
         # Add proxy if provided
         # if proxy_host and proxy_port:
-        if headless:    
-            chrome_options.add_argument('--headless=new')
-        # if self.proxy:
-        #     print(f"Configuring proxy: {self.proxy}")
-        #     chrome_options.add_argument(f"--proxy-server={self.proxy}")
+        # if headless:    
+        #     chrome_options.add_argument('--headless=new')
+        if self.proxy:
+            print(f"Configuring proxy: {self.proxy}")
+            chrome_options.add_argument(f"--proxy-server={self.proxy}")
 
-        # chrome_options.add_argument('--headless=new')
+        chrome_options.add_argument('--headless=new')
         # chrome_options.add_argument(f'--proxy-server=http://ng.decodo.com:42001')
         # Additional options for better compatibility
         chrome_options.add_argument('--no-sandbox')
