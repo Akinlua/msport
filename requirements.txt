@@ -7,3 +7,5 @@ selenium_driverless
 nest_asyncio
 2captcha-python
 psutil
+blinker==1.7.0
+selenium-wire

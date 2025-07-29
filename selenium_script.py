@@ -4,129 +4,98 @@ import time
 import os
 import tempfile
 import uuid
-from selenium import webdriver
+import json
+from seleniumwire import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 
 
 class WebsiteOpener:
-    """A class to handle opening websites with Selenium."""
+    """A class to handle opening websites with Selenium Wire for proxy authentication."""
 
-    def __init__(self, headless=False, proxy=None):
+    def __init__(self, headless=False, proxy=None, config_file="config.json"):
         """
         Initialize the WebsiteOpener.
         
         Args:
             headless (bool): Whether to run Chrome in headless mode
             proxy (str): Proxy URL in format "host:port" or "user:pass@host:port"
+            config_file (str): Path to config.json file containing proxy settings
         """
         self.proxy = proxy
+        self.config_file = config_file
         self.setup_driver(headless)
     
-    def setup_driver(self, headless):
-        """Set up the Chrome WebDriver."""
-
-        chrome_options = Options()
+    def get_proxy_from_config(self):
+        """Extract proxy URL from config.json file."""
+        try:
+            with open(self.config_file, 'r') as f:
+                config = json.load(f)
+            
+            if config.get('use_proxies', False) and config.get('accounts'):
+                # Get the first active account's proxy
+                for account in config['accounts']:
+                    if account.get('active', False) and account.get('proxy'):
+                        return account['proxy']
+            
+            return None
+        except Exception as e:
+            print(f"Error reading config file: {e}")
+            return None
     
-        # Add proxy if provided
-        # if proxy_host and proxy_port:
-        # if headless:    
-        #     chrome_options.add_argument('--headless=new')
+    def setup_driver(self, headless):
+        """Set up the Chrome WebDriver with Selenium Wire for proxy authentication."""
+
+        # Get proxy from config if not provided
+        if not self.proxy:
+            self.proxy = self.get_proxy_from_config()
+        
+        # Set up Chrome options
+        options = Options()
+        # if headless:
+        options.add_argument("--headless=new")
+        
+        # Additional options for better compatibility
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--window-size=1920,1080')
+        
+        # Set up Selenium Wire options for proxy authentication
+        seleniumwire_options = {}
+        
         if self.proxy:
             print(f"Configuring proxy: {self.proxy}")
-            chrome_options.add_argument(f"--proxy-server={self.proxy}")
+            
+            # Parse the proxy URL to extract components
+            if self.proxy.startswith("http://"):
+                proxy_url = self.proxy
+            else:
+                proxy_url = f"http://{self.proxy}"
+            
+            # Configure selenium-wire options with proxy
+            seleniumwire_options = {
+                "proxy": {
+                    "http": proxy_url,
+                    "https": proxy_url
+                }
+            }
+            
+            print(f"Configured Selenium Wire proxy: {proxy_url}")
+        
+        # Initialize the Chrome driver with Selenium Wire
+        try:
+            self.driver = webdriver.Chrome(
+                # service=Service(ChromeDriverManager().install()),
+                seleniumwire_options=seleniumwire_options,
+                options=options
+            )
+            print(f"Driver successful: {self.driver}")
+        except Exception as e:
+            print(f"Error setting up ChromeDriver: {e}")
+            raise
 
-        chrome_options.add_argument('--headless=new')
-        # chrome_options.add_argument(f'--proxy-server=http://ng.decodo.com:42001')
-        # Additional options for better compatibility
-        chrome_options.add_argument('--no-sandbox')
-        chrome_options.add_argument('--disable-dev-shm-usage')
-        chrome_options.add_argument('--disable-gpu')
-        chrome_options.add_argument('--window-size=1920,1080')
-        
-        # Create and return driverA
-        driver = webdriver.Chrome(options=chrome_options)
-        print(f"Driver succesful: {driver}")
-        self.driver = driver
-
-        # chrome_options = Options()
-        # if headless:
-        #     chrome_options.add_argument("--headless=new")
-        
-        # # Add additional options for stability
-        # chrome_options.add_argument('--no-sandbox')
-        # chrome_options.add_argument('--disable-dev-shm-usage')
-        # chrome_options.add_argument('--disable-gpu')
-        # chrome_options.add_argument('--window-size=1920,1080')
-        
-        # # # Add unique user data directory to prevent conflicts
-        # # temp_dir = tempfile.gettempdir()
-        # # unique_id = str(uuid.uuid4())
-        # # user_data_dir = os.path.join(temp_dir, f"chrome_user_data_{unique_id}")
-        # # chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
-        
-        # # # Additional server-friendly options
-        # # chrome_options.add_argument("--disable-background-timer-throttling")
-        # # chrome_options.add_argument("--disable-backgrounding-occluded-windows")
-        # # chrome_options.add_argument("--disable-renderer-backgrounding")
-        # # chrome_options.add_argument("--disable-features=TranslateUI")
-        # # chrome_options.add_argument("--disable-ipc-flooding-protection")
-        # # chrome_options.add_argument("--single-process")
-        # # chrome_options.add_argument("--remote-debugging-port=0")  # Use random port
-        
-        # # chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36")
-        # # chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        # # chrome_options.add_experimental_option('useAutomationExtension', False)
-        # # chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-        
-        # # Add proxy configuration if provided
-        # if self.proxy:
-        #     print(f"Configuring proxy: {self.proxy}")
-        #     # Handle different proxy formats
-        #     if self.proxy.startswith("http://") or self.proxy.startswith("https://"):
-        #         proxy_url = self.proxy
-        #     else:
-        #         proxy_url = f"http://{self.proxy}"
-            
-        #     chrome_options.add_argument(f"--proxy-server={proxy_url}")
-        #     print(f"Added proxy argument: --proxy-server={proxy_url}")
-            
-        #     # Add additional proxy-related arguments for better compatibility
-        #     # chrome_options.add_argument("--ignore-certificate-errors")
-        #     # chrome_options.add_argument("--ignore-ssl-errors")
-        #     # chrome_options.add_argument("--ignore-certificate-errors-spki-list")
-        
-        # # Use direct path to Chrome on Mac
-        # # if os.path.exists("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"):
-        # #     chrome_options.binary_location = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-        
-        # print(f"Setting up ChromeDriver with options: {chrome_options}")
-        # try:
-        #     # Use standard ChromeDriverManager
-        #     print("Installing ChromeDriver")
-        #     # driver_path = ChromeDriverManager().install()
-        #     # print(f"Driver path: {driver_path}")
-        #     self.driver = webdriver.Chrome(
-        #         # service=Service("/usr/local/bin/chromedriver"),
-        #         options=chrome_options
-        #     )
-            
-        # except Exception as e:
-        #     print(f"Error setting up ChromeDriver: {e}")
-        #     # Try alternative setup method if first method fails
-        #     try:
-        #         print("Trying alternative setup method...")
-        #         from selenium.webdriver.chrome.service import Service as ChromeService
-                
-        #         self.driver = webdriver.Chrome(
-        #             # service=ChromeService(),
-        #             options=chrome_options
-        #         )
-        #     except Exception as e2:
-        #         print(f"Alternative setup also failed: {e2}")
-        #         raise
-        
     def open_url(self, url):
         """
         Open the specified URL in the browser.
@@ -160,24 +129,31 @@ class WebsiteOpener:
 
 
 def main():
-    """Main function to demonstrate usage."""
-    # Example URL
-    url = "https://www.example.com"
+    """Main function to demonstrate usage with proxy from config.json."""
+    # Example URL to test proxy
+    url = "https://httpbin.io/ip"
     
-    # Example proxy (optional) - format: "host:port" or "user:pass@host:port"
-    proxy = None  # Set to your proxy if needed, e.g., "proxy.example.com:8080"
+    # Create an instance of WebsiteOpener (will automatically use proxy from config.json)
+    opener = WebsiteOpener(headless=False)
     
-    # Create an instance of WebsiteOpener
-    opener = WebsiteOpener(headless=False, proxy=proxy)
-    
-    # Open the URL
-    opener.open_url(url)
-    
-    # Wait for a few seconds to view the page
-    time.sleep(3)
-    
-    # Close the browser
-    opener.close()
+    try:
+        # Open the URL
+        if opener.open_url(url):
+            # Wait for page to load
+            time.sleep(3)
+            
+            # Print the page content to see the IP address
+            try:
+                body_text = opener.driver.find_element("tag name", "body").text
+                print(f"Page content: {body_text}")
+            except Exception as e:
+                print(f"Error reading page content: {e}")
+        
+    except Exception as e:
+        print(f"Error during execution: {e}")
+    finally:
+        # Close the browser
+        opener.close()
 
 
 if __name__ == "__main__":
