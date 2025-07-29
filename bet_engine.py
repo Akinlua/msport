@@ -1101,6 +1101,14 @@ class BetEngine(WebsiteOpener):
                         print("✅ Bet placed successfully!")
                         return True
                     else:
+                        # Take screenshot of failed bet state
+                        try:
+                            timestamp = time.strftime("%Y%m%d-%H%M%S")
+                            screenshot_path = f"failed_bet_screenshot_{timestamp}.png"
+                            self.driver.save_screenshot(screenshot_path)
+                            print(f"Failed bet screenshot saved to {screenshot_path}")
+                        except Exception as screenshot_error:
+                            print(f"Failed to take failed bet screenshot: {screenshot_error}")
                         print("⚠️ No success confirmation found, bet may have failed")
                         return False
                 
