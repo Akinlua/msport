@@ -43,8 +43,8 @@ class BetAccount:
         self.current_bets = max(0, self.current_bets - 1)
         
     def can_place_bet(self):
-        print(f"Account {self.username} can place bet: {self.active} {self.cookie_jar is not None} {self.current_bets < self.max_concurrent_bets} {self.balance >= self.min_balance}")
-        print(f"current bets: {self.current_bets} max concurrent bets: {self.max_concurrent_bets} balance: {self.balance} min balance: {self.min_balance}")
+        # print(f"Account {self.username} can place bet: {self.active} {self.cookie_jar is not None} {self.current_bets < self.max_concurrent_bets} {self.balance >= self.min_balance}")
+        # print(f"current bets: {self.current_bets} max concurrent bets: {self.max_concurrent_bets} balance: {self.balance} min balance: {self.min_balance}")
         return (self.active and 
                 self.current_bets < self.max_concurrent_bets)
         
@@ -91,7 +91,7 @@ class BetEngine(WebsiteOpener):
         self.__browser_open = False
         self.__headless = headless
         self.__skip_initial_login = skip_initial_login
-        print(f"BetEngine initialized with headless: {headless}, skip_initial_login: {skip_initial_login}")
+        # print(f"BetEngine initialized with headless: {headless}, skip_initial_login: {skip_initial_login}")
         self.__bet_api_host = bet_api_host
         self.__bet_host = bet_host
         self.__min_ev = min_ev
@@ -125,8 +125,8 @@ class BetEngine(WebsiteOpener):
         if (self.__browser_initialized and 
             current_proxy != target_proxy and 
             self.__config.get("use_proxies", False)):
-            print(f"Proxy change detected: {current_proxy} -> {target_proxy}")
-            print("Cleaning up browser to switch proxy...")
+            # print(f"Proxy change detected: {current_proxy} -> {target_proxy}")
+            # print("Cleaning up browser to switch proxy...")
             self._cleanup_browser_for_proxy_switch()
         
         if not self.__browser_initialized:
@@ -473,13 +473,13 @@ class BetEngine(WebsiteOpener):
             # print(f"Navigated to login page: {login_url}")
             
             # Find phone number input (based on the images provided)
-            print("🔍 Looking for login form elements...")
+            # print("🔍 Looking for login form elements...")
             phone_input = WebDriverWait(self.driver, 10).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='tel'], input[placeholder*='Mobile']"))
             )
             phone_input.clear()
             phone_input.send_keys(account.username)
-            print(f"📱 Entered phone number: {account.username}")
+            # print(f"📱 Entered phone number: {account.username}")
             
             # Find password input
             password_input = WebDriverWait(self.driver, 10).until(
@@ -487,14 +487,14 @@ class BetEngine(WebsiteOpener):
             )
             password_input.clear()
             password_input.send_keys(account.password)
-            print(f"🔑 Entered password")
+            # print(f"🔑 Entered password")
             
             # Find and click login button
             login_button = WebDriverWait(self.driver, 10).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "button[type='submit'], .v-button.btn.login.popper-input-button"))
             )
             login_button.click()
-            print(f"🚀 Clicked login button")
+            # print(f"🚀 Clicked login button")
             
             # Check for additional CAPTCHA after login attempt
             # time.sleep(10)
@@ -522,7 +522,7 @@ class BetEngine(WebsiteOpener):
                 timestamp = time.strftime("%Y%m%d-%H%M%S")
                 screenshot_path = f"login_status_{timestamp}.png"
                 self.driver.save_screenshot(screenshot_path)
-                print(f"📸 Login status screenshot saved to {screenshot_path}")
+                # print(f"📸 Login status screenshot saved to {screenshot_path}")
             except Exception as screenshot_error:
                 print(f"Failed to take screenshot: {screenshot_error}")
 
@@ -623,7 +623,7 @@ class BetEngine(WebsiteOpener):
                 print(f"Searching with URL: {search_url} and params: {params}")
                 response = requests.get(search_url, params=params, headers=headers)
                 
-                print(f"Response status: {response.status_code}")
+                # print(f"Response status: {response.status_code}")
                 # print(f"Response content: {response.text[:500]}...")
                 if response.status_code == 200:
                     try:
@@ -799,7 +799,7 @@ class BetEngine(WebsiteOpener):
             print(f"Error generating MSport bet URL: {e}")
             return None
 
-    def __place_bet_with_selenium(self, account, bet_url, market_type, outcome, odds, stake, points=None):
+    def __place_bet_with_selenium(self, account, bet_url, market_type, outcome, odds, stake, points=None, is_first_half=False):
         """
         Place a bet on MSport using Selenium
         
@@ -839,8 +839,8 @@ class BetEngine(WebsiteOpener):
             time.sleep(3)
             
             # Find and click the market/outcome
-            market_element = self.__get_market_selector(market_type, outcome, points, is_first_half=False)
-            print(f"Market element: {market_element}")
+            market_element = self.__get_market_selector(market_type, outcome, points, is_first_half)
+            # print(f"Market element: {market_element}")
             if not market_element:
                 print("Could not find market element")
                 return False
@@ -850,7 +850,8 @@ class BetEngine(WebsiteOpener):
                 
                 # Verify odds before placing bet
                 try:
-                    odds_element = market_element.find_element(By.CSS_SELECTOR, ".odds")
+                    # Use more specific selector to find odds within the correct div structure
+                    odds_element = market_element.find_element(By.CSS_SELECTOR, ".has-desc.m-outcome.multiple .odds")
                     odds_text = odds_element.text.strip()
                     import re
                     odds_match = re.search(r'(\d+\.?\d*)', odds_text)
@@ -867,48 +868,39 @@ class BetEngine(WebsiteOpener):
                 except Exception as e:
                     print(f"Could not verify odds: {e}")
                 
-                # Improved scrolling and clicking approach
+                # Simple direct clicking approach - no scrolling
                 try:
-                    # First, scroll the element into view with some offset to avoid header overlap
-                    self.driver.execute_script("""
-                        var element = arguments[0];
-                        var elementRect = element.getBoundingClientRect();
-                        var absoluteElementTop = elementRect.top + window.pageYOffset;
-                        var middle = absoluteElementTop - (window.innerHeight / 2) + 100;
-                        window.scrollTo(0, middle);
-                    """, market_element)
-                    time.sleep(1)
-                    
                     # Wait for element to be clickable
                     WebDriverWait(self.driver, 10).until(
-                        EC.element_to_be_clickable((By.CSS_SELECTOR, f"#{market_element.get_attribute('id')}")) if market_element.get_attribute('id') else 
                         EC.element_to_be_clickable(market_element)
                     )
                     
-                    # Try JavaScript click if regular click fails
-                    try:
-                        market_element.click()
-                        print(f"Clicked on market: {market_type} - {outcome} - {points}")
-                    except Exception as click_error:
-                        print(f"Regular click failed, trying JavaScript click: {click_error}")
-                        self.driver.execute_script("arguments[0].click();", market_element)
-                        print(f"JavaScript clicked on market: {market_type} - {outcome} - {points}")
-                    
+                    # Direct click on the element
+                    market_element.click()
+                    print(f"Clicked on market: {market_type} - {outcome} - {points}")
                     time.sleep(2)
                     
-                except Exception as scroll_click_error:
-                    print(f"Failed to scroll and click element: {scroll_click_error}")
+                except Exception as click_error:
+                    print(f"Direct click failed, trying JavaScript click: {click_error}")
                     
-                    # Last resort: try moving to element and clicking
+                    # Fallback to JavaScript click
                     try:
-                        actions = ActionChains(self.driver)
-                        actions.move_to_element(market_element).click().perform()
-                        print(f"ActionChains clicked on market: {market_type} - {outcome} - {points}")
+                        self.driver.execute_script("arguments[0].click();", market_element)
+                        print(f"JavaScript clicked on market: {market_type} - {outcome} - {points}")
                         time.sleep(2)
-                    except Exception as action_error:
-                        print(f"ActionChains also failed: {action_error}")
-                        raise Exception("All click methods failed")
+                    except Exception as js_error:
+                        print(f"JavaScript click also failed: {js_error}")
                         
+                        # Last resort: try ActionChains
+                        try:
+                            actions = ActionChains(self.driver)
+                            actions.move_to_element(market_element).click().perform()
+                            print(f"ActionChains clicked on market: {market_type} - {outcome} - {points}")
+                            time.sleep(2)
+                        except Exception as action_error:
+                            print(f"All click methods failed: {action_error}")
+                            raise Exception("All click methods failed")
+                
             except Exception as e:
                     print(f"Could not click market element: {e}")
                     return False
@@ -1154,12 +1146,24 @@ class BetEngine(WebsiteOpener):
         if is_first_half:
             # Click halftime button first
             try:
-                halftime_button = self.driver.find_element(By.CSS_SELECTOR, ".m-sub-nav-item.snap-nav-item:nth-child(4)")
-                halftime_button.click()
+                # Wait for the first half button to be present and clickable
+                halftime_button = WebDriverWait(self.driver, 10).until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, "ul.snap-nav.tw-relative.tw-flex.tw-select-none.tw-whitespace-nowrap li.m-sub-nav-item.snap-nav-item:nth-child(5)"))
+                )
+                
+                # Try regular click first
+                try:
+                    halftime_button.click()
+                    # print("Clicked first half tab")
+                except Exception as click_error:
+                    print(f"Regular click failed, trying JavaScript click: {click_error}")
+                    # Use JavaScript click as fallback
+                    self.driver.execute_script("arguments[0].click();", halftime_button)
+                    print("JavaScript clicked first half tab")
+                
                 time.sleep(2)
-                print("Clicked halftime tab")
             except Exception as e:
-                print(f"Could not click halftime tab: {e}")
+                print(f"Could not click first half tab: {e}")
                 return None
         
         # Get all market rows
@@ -1186,6 +1190,12 @@ class BetEngine(WebsiteOpener):
         elif market_type_lower == "spread":
             if not points:
                 return None
+            
+            # Check if handicap is 0 - if so, use DNB (Draw No Bet) market instead
+            if abs(float(points)) < 0.01:  # Using small threshold for floating point comparison
+                print(f"Handicap is 0, looking for DNB (Draw No Bet) market instead of Asian Handicap")
+                return self.__find_dnb_outcome(outcome_lower, is_first_half)
+            
             return self.__find_handicap_outcome(points, outcome_lower)
         
         return None
@@ -1382,6 +1392,82 @@ class BetEngine(WebsiteOpener):
             
         except Exception as e:
             print(f"Error finding handicap outcome: {e}")
+            return None
+
+    def __find_dnb_outcome(self, outcome, is_first_half=False):
+        """
+        Find the DNB (Draw No Bet) outcome element
+        
+        Parameters:
+        - outcome: 'home' or 'away'
+        - is_first_half: Whether this is a first half bet
+        
+        Returns:
+        - Element or None if not found
+        """
+        try:
+            # First, find all market items
+            market_items = self.driver.find_elements(By.CSS_SELECTOR, ".m-market-item")
+            
+            if not market_items:
+                print("No market items found")
+                return None
+            
+            # Look for DNB market item
+            dnb_market_item = None
+            for market_item in market_items:
+                try:
+                    # Check the h1 element with the correct class structure
+                    h1_element = market_item.find_element(By.CSS_SELECTOR, "h1.m-market-item--name a.tw-flex.tw-items-center span.tw-line-clamp-2")
+                    market_name = h1_element.text.strip().lower()
+                    
+                    # Check if this is DNB market
+                    if "dnb" in market_name:
+                        # For first half, ensure "1st half" is also present
+                        if is_first_half:
+                            if "1st half" in market_name:
+                                dnb_market_item = market_item
+                                print(f"Found first half DNB market: {market_name}")
+                                break
+                        else:
+                            # For normal matches, ensure "1st half" is NOT present
+                            if "1st half" not in market_name:
+                                dnb_market_item = market_item
+                                print(f"Found normal DNB market: {market_name}")
+                                break
+                except Exception as e:
+                    # This market item doesn't have the expected structure, continue to next
+                    continue
+            
+            if not dnb_market_item:
+                print("No DNB market item found")
+                return None
+            
+            # Now get the content div within this market item
+            content_div = dnb_market_item.find_element(By.CSS_SELECTOR, ".m-market-item--content")
+            
+            # Get all outcome divs within this content div
+            outcome_divs = content_div.find_elements(By.CSS_SELECTOR, ".has-desc.m-outcome.multiple")
+            
+            if len(outcome_divs) < 2:
+                print(f"Expected 2 outcomes for DNB, found {len(outcome_divs)}")
+                return None
+            
+            # First div is home, second is away
+            target_div = outcome_divs[0] if outcome == "home" else outcome_divs[1]
+            
+            # Verify odds
+            try:
+                odds_element = target_div.find_element(By.CSS_SELECTOR, ".odds")
+                odds_text = odds_element.text.strip()
+                print(f"Found DNB {outcome} with odds: {odds_text}")
+                return target_div
+            except Exception as e:
+                print(f"Could not find odds in DNB outcome: {e}")
+                return None
+            
+        except Exception as e:
+            print(f"Error finding DNB outcome: {e}")
             return None
 
     def __place_bet_with_available_account(self, bet_data):
@@ -1994,13 +2080,15 @@ class BetEngine(WebsiteOpener):
             moneyline_market = "1st half - 1x2"
             total_market = "1st half - o/u"
             spread_market = "1st half - asian handicap"
+            dnb_market = "1st half - dnb"
         else:
             # Full match market descriptions
             moneyline_market = "1x2"
             total_market = "over/under"
             spread_market = "asian handicap"
+            dnb_market = "dnb"
         
-        print(f"Looking for markets: moneyline='{moneyline_market}', total='{total_market}', spread='{spread_market}'")
+        print(f"Looking for markets: moneyline='{moneyline_market}', total='{total_market}', spread='{spread_market}', dnb='{dnb_market}'")
 
         # Handle MONEYLINE bets (1X2 in MSport)
         if line_type.lower() == "money_line":
@@ -2115,6 +2203,38 @@ class BetEngine(WebsiteOpener):
             
         # Handle SPREAD bets (Asian Handicap in MSport)
         elif line_type.lower() == "spread":
+            original_points = float(points)
+            
+            # Check if handicap is 0 - if so, use DNB (Draw No Bet) market instead
+            if abs(original_points) < 0.01:  # Using small threshold for floating point comparison
+                print(f"Handicap is 0, looking for DNB (Draw No Bet) market instead of Asian Handicap")
+                
+                # Map outcome to MSport format for DNB (based on actual API structure)
+                outcome_map = {"home": "4", "away": "5"}
+                if outcome.lower() not in outcome_map:
+                    print(f"Invalid outcome for DNB: {outcome}")
+                    return None, None, None
+                    
+                target_outcome_id = outcome_map[outcome.lower()]
+                
+                # Look for DNB market
+                dnb_market_name = dnb_market
+                
+                for market in markets:
+                    market_desc = market.get("description", "").lower()
+                    print(f"Checking market: '{market_desc}' against target: '{dnb_market_name}'")
+                    
+                    if market_desc == dnb_market_name:
+                        # Find matching outcome
+                        for market_outcome in market.get("outcomes", []):
+                            if market_outcome.get("id") == target_outcome_id:
+                                print(f"Found DNB market: {market['description']} outcome {target_outcome_id} with odds {market_outcome['odds']}")
+                                return market_outcome["id"], float(market_outcome["odds"]), 0.0  # Return 0.0 as adjusted points
+                
+                print(f"No matching DNB market found for {outcome}")
+                return None, None, None
+            
+            # Original Asian Handicap logic for non-zero handicaps
             # Map outcome to MSport format for Asian Handicap
             outcome_map = {"home": "1714", "away": "1715"}
             if outcome.lower() not in outcome_map:
@@ -2122,7 +2242,6 @@ class BetEngine(WebsiteOpener):
                 return None, None, None
                 
             target_outcome_id = outcome_map[outcome.lower()]
-            original_points = float(points)
             
             # Round to nearest 0.5 increment first (e.g., -0.25 -> -0.5, +1.3 -> +1.5, -1.7 -> -1.5)
             rounded_points = round(original_points * 2) / 2
@@ -2397,6 +2516,8 @@ class BetEngine(WebsiteOpener):
         """
         Test function to directly test bet placement with real event data
         This bypasses the normal alert flow and tests the CSS selector system
+        
+        NEW: Now supports DNB (Draw No Bet) market when handicap is 0
         """
         print("=== Testing Direct Bet Placement ===")
         
@@ -2417,6 +2538,8 @@ class BetEngine(WebsiteOpener):
             "sportId": 1,  # 1 for soccer, 3 for basketball
             "starts": None  # can add start time in milliseconds if needed
         }
+        
+        print(f"Testing DNB market with handicap 0: {test_data['category']['meta']['value']}")
         
         try:
             # Step 1: Search for the event
@@ -2562,7 +2685,13 @@ class BetEngine(WebsiteOpener):
             self.cleanup()
 
 if __name__ == "__main__":
-    """Main Application"""
+    """Main Application
+    
+    NEW FEATURE: Now supports DNB (Draw No Bet) market when handicap is 0
+    - When handicap points is 0, the system will look for DNB market instead of Asian Handicap
+    - DNB market has only 2 outcomes: Home and Away (no Draw)
+    - This provides better odds for matches where a draw is unlikely
+    """
     bet_engine = BetEngine(
         headless=os.getenv("ENVIRONMENT") == "production",
         config_file="config.json"

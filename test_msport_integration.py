@@ -59,8 +59,8 @@ def test_event_search():
     
     try:
         # Test search with sample teams
-        home_team = "CFR Cluj"
-        away_team = "Champions FC Arges"
+        home_team = "Corinthians"
+        away_team = "Fortaleza"
         
         print(f"Searching for event: {home_team} vs {away_team}")
         event_id = bet_engine.search_event(home_team, away_team)
@@ -161,8 +161,8 @@ def test_bet_placement():
         # Test data similar to what would come from Pinnacle
         test_shaped_data = {
             "game": {
-                "away": "Champions FC Arges",
-                "home": "CFR Cluj"
+                "away": "Fortaleza",
+                "home": "Corinthians"
             },
             "category": {
                 "type": "money_line",
@@ -206,8 +206,8 @@ def test_direct_bet_placement():
     
     try:
         # Step 1: Search for a real event
-        home_team = "CFR Cluj"
-        away_team = "Champions FC Arges"
+        home_team = "Corinthians"
+        away_team = "Fortaleza"
 
         print(f"Searching for event: {home_team} vs {away_team}")
         event_id = bet_engine.search_event(home_team, away_team)
@@ -233,7 +233,7 @@ def test_direct_bet_placement():
         outcome_id, odds, adjusted_points = bet_engine.find_market_bet_code_with_points(
             event_details,
             "spread",  # Changed from "money_line" to "spread"
-            "-0.5",    # Added handicap points
+            "0",    # Added handicap points
             "home",
             False,  # is_first_half
             1,      # sport_id (soccer)
@@ -285,11 +285,11 @@ def test_direct_bet_placement():
             "sportId": 1,
             "eventId": event_id,
             "priceHome": odds,        # Home team handicap odds
-            "priceAway": 1.85,        # Away team handicap odds (for +0.5)
+            "priceAway": 1.82,        # Away team handicap odds (for +0.5)
             # Remove priceDraw since handicap doesn't have draw
             "_decimal_prices": {
                 "home": float(odds),  # Home team with handicap
-                "away": 1.85          # Away team with opposite handicap
+                "away": 1.82          # Away team with opposite handicap
             },
             "_outcome_key": "home"    # Betting on home team with the handicap
         }
@@ -329,7 +329,8 @@ def test_direct_bet_placement():
             "home",
             float(odds),
             stake,
-            shaped_data['category']['meta']['value']  # Pass the handicap points
+            shaped_data['category']['meta']['value'],  # Pass the handicap points
+            False  # for first half
         )
         
         # For testing purposes, let's just simulate success
@@ -361,13 +362,13 @@ def test_url_generation():
     try:
         # Sample event details
         event_details = {
-            "homeTeam": "CFR Cluj",
-            "awayTeam": "Champions FC Arges",
-            "eventId": "sr:match:58052699"
+            "homeTeam": "Corinthians",
+            "awayTeam": "Fortaleza",
+            "eventId": "sr:match:58052743"
         }
         
         url = bet_engine.generate_msport_bet_url(event_details)
-        expected_pattern = "CFR_Cluj/Champions_FC_Arges/sr:match:58052699"
+        expected_pattern = "Corinthians/Fortaleza/sr:match:58052743"
         
         print(f"Generated URL: {url}")
         
