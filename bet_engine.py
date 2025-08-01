@@ -836,7 +836,7 @@ class BetEngine(WebsiteOpener):
             
             print(f"Navigating to betting page: {bet_url}")
             self.open_url(bet_url)
-            time.sleep(3)
+            # time.sleep(3)
             
             # Find and click the market/outcome
             market_element = self.__get_market_selector(market_type, outcome, points, is_first_half)
@@ -878,7 +878,7 @@ class BetEngine(WebsiteOpener):
                     # Direct click on the element
                     market_element.click()
                     print(f"Clicked on market: {market_type} - {outcome} - {points}")
-                    time.sleep(2)
+                    # time.sleep(2)
                     
                 except Exception as click_error:
                     print(f"Direct click failed, trying JavaScript click: {click_error}")
@@ -887,7 +887,7 @@ class BetEngine(WebsiteOpener):
                     try:
                         self.driver.execute_script("arguments[0].click();", market_element)
                         print(f"JavaScript clicked on market: {market_type} - {outcome} - {points}")
-                        time.sleep(2)
+                        # time.sleep(2)
                     except Exception as js_error:
                         print(f"JavaScript click also failed: {js_error}")
                         
@@ -896,7 +896,7 @@ class BetEngine(WebsiteOpener):
                             actions = ActionChains(self.driver)
                             actions.move_to_element(market_element).click().perform()
                             print(f"ActionChains clicked on market: {market_type} - {outcome} - {points}")
-                            time.sleep(2)
+                            # time.sleep(2)
                         except Exception as action_error:
                             print(f"All click methods failed: {action_error}")
                             raise Exception("All click methods failed")
@@ -943,7 +943,7 @@ class BetEngine(WebsiteOpener):
                 
                 if result:
                     print(f"✅ Successfully entered stake: 10 using JavaScript")
-                    time.sleep(1)
+                    # time.sleep(1)
                 else:
                     print("❌ JavaScript stake input failed, trying fallback methods")
                     
@@ -972,10 +972,10 @@ class BetEngine(WebsiteOpener):
                     
                     # Clear and enter stake with Selenium
                     stake_input.clear()
-                    time.sleep(0.5)
+                    # time.sleep(0.5)
                     stake_input.send_keys(str(10))
                     print(f"Entered stake using Selenium fallback: 10")
-                    time.sleep(1)
+                    # time.sleep(1)
                 
             except Exception as e:
                 print(f"Error entering stake: {e}")
@@ -1037,7 +1037,7 @@ class BetEngine(WebsiteOpener):
                         var middle = absoluteElementTop - (window.innerHeight / 2) + 150;
                         window.scrollTo(0, middle);
                     """, place_bet_button)
-                    time.sleep(1)
+                    # time.sleep(1)
                     
                     # Wait for button to be clickable
                     WebDriverWait(self.driver, 10).until(
@@ -1053,7 +1053,7 @@ class BetEngine(WebsiteOpener):
                         self.driver.execute_script("arguments[0].click();", place_bet_button)
                         print("JavaScript clicked place bet button")
                     
-                    time.sleep(3)
+                    # time.sleep(3)
                     
                 except Exception as scroll_click_error:
                     print(f"Failed to scroll and click bet button: {scroll_click_error}")
@@ -1063,7 +1063,7 @@ class BetEngine(WebsiteOpener):
                         actions = ActionChains(self.driver)
                         actions.move_to_element(place_bet_button).click().perform()
                         print("ActionChains clicked place bet button")
-                        time.sleep(3)
+                        # time.sleep(3)
                     except Exception as action_error:
                         print(f"ActionChains also failed for bet button: {action_error}")
                         raise Exception("All click methods failed for bet button")
@@ -1161,7 +1161,7 @@ class BetEngine(WebsiteOpener):
                     self.driver.execute_script("arguments[0].click();", halftime_button)
                     print("JavaScript clicked first half tab")
                 
-                time.sleep(2)
+                # time.sleep(2)
             except Exception as e:
                 print(f"Could not click first half tab: {e}")
                 return None
@@ -2609,7 +2609,7 @@ class BetEngine(WebsiteOpener):
             self._initialize_browser_if_needed(test_data["accounts"][0])
             print(f"Navigating to: {bet_url}")
             self.open_url(bet_url)
-            time.sleep(3)
+            # time.sleep(3)
             
             # Test the new selector system
             market_element = self.__get_market_selector(line_type, outcome, points, is_first_half=False)
@@ -2634,7 +2634,7 @@ class BetEngine(WebsiteOpener):
                         var middle = absoluteElementTop - (window.innerHeight / 2) + 100;
                         window.scrollTo(0, middle);
                     """, market_element)
-                    time.sleep(2)
+                    # time.sleep(2)
                     
                     # Check if element is now in viewport and clickable
                     element_rect = self.driver.execute_script("""
