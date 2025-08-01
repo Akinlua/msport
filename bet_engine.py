@@ -1161,7 +1161,7 @@ class BetEngine(WebsiteOpener):
                     self.driver.execute_script("arguments[0].click();", halftime_button)
                     print("JavaScript clicked first half tab")
                 
-                # time.sleep(2)
+                time.sleep(2)
             except Exception as e:
                 print(f"Could not click first half tab: {e}")
                 return None
@@ -2616,7 +2616,7 @@ class BetEngine(WebsiteOpener):
             self._initialize_browser_if_needed(test_data["accounts"][0])
             print(f"Navigating to: {bet_url}")
             self.open_url(bet_url)
-            # time.sleep(3)
+            time.sleep(3)
             
             # Test the new selector system
             market_element = self.__get_market_selector(line_type, outcome, points, is_first_half=False)
