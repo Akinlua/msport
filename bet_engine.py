@@ -1168,6 +1168,13 @@ class BetEngine(WebsiteOpener):
         
         # Get all market rows
         try:
+            # Take screenshot before searching for market rows
+            try:
+                screenshot_path = f"market_search_{int(time.time())}.png"
+                self.driver.save_screenshot(screenshot_path)
+                print(f"Market search screenshot saved to {screenshot_path}")
+            except Exception as screenshot_error:
+                print(f"Failed to take market search screenshot: {screenshot_error}")
             market_rows = self.driver.find_elements(By.CSS_SELECTOR, ".m-market-row.m-market-row--3")
             if not market_rows:
                 print("No market rows found")
