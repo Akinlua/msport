@@ -439,6 +439,36 @@ class BetEngine(WebsiteOpener):
             # else:
             #     print("⚠️  CAPTCHA solving is disabled in configuration")
             #     captcha_solver = None
+
+            # Check if already logged in first
+            try:
+                # Look for account balance element which indicates successful login
+                balance_element = WebDriverWait(self.driver, 5).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, ".account--balance.account-item.tw-text-yellow"))
+                )
+                print(f"Already logged in for account: {account.username}")
+                
+                # Get cookies from selenium
+                selenium_cookies = self.driver.get_cookies()
+                account.set_cookie_jar(selenium_cookies)
+                
+                # Fetch account balance after successful login
+                balance = self.__fetch_account_balance(account)
+                account.balance = balance
+                print(f"Updated account balance: {balance:.2f}")
+            
+                # If this is the first account, also store cookies in the class for search functionality
+                if self.__accounts and account == self.__accounts[0]:
+                    self.__cookie_jar = account.cookie_jar
+                
+                return True
+                
+            except TimeoutException:
+                print(f"Not logged in, proceeding with login process for account: {account.username}")
+                # Continue with login process
+            except Exception as e:
+                print(f"Error checking login status: {e}")
+                # Continue with login process
             
             # Navigate to MSport login page
             login_url = f"{self.__bet_host}"
@@ -479,7 +509,7 @@ class BetEngine(WebsiteOpener):
             )
             phone_input.clear()
             phone_input.send_keys(account.username)
-            # print(f"📱 Entered phone number: {account.username}")
+            print(f"📱 Entered phone number: {account.username}")
             
             # Find password input
             password_input = WebDriverWait(self.driver, 10).until(
@@ -487,14 +517,14 @@ class BetEngine(WebsiteOpener):
             )
             password_input.clear()
             password_input.send_keys(account.password)
-            # print(f"🔑 Entered password")
+            print(f"🔑 Entered password")
             
             # Find and click login button
             login_button = WebDriverWait(self.driver, 10).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "button[type='submit'], .v-button.btn.login.popper-input-button"))
             )
             login_button.click()
-            # print(f"🚀 Clicked login button")
+            print(f"🚀 Clicked login button")
             
             # Check for additional CAPTCHA after login attempt
             # time.sleep(10)
@@ -561,6 +591,14 @@ class BetEngine(WebsiteOpener):
                 raise Exception("Login verification timeout")
                 
         except Exception as e:
+            # Take screenshot of error state
+            try:
+                timestamp = time.strftime("%Y%m%d-%H%M%S")
+                screenshot_path = f"login_error_{timestamp}.png"
+                self.driver.save_screenshot(screenshot_path)
+                print(f"Login error screenshot saved to {screenshot_path}")
+            except Exception as screenshot_error:
+                print(f"Failed to take error screenshot: {screenshot_error}")
             print(f"❌ Login failed for account: {account.username}: {e}")
             raise
 
@@ -811,23 +849,13 @@ class BetEngine(WebsiteOpener):
         - odds: Expected odds
         - stake: Amount to stake
         - points: Points value for total/spread bets
+        - is_first_half: Whether this is a first half bet
         
         Returns:
         - True if bet was placed successfully, False otherwise
         """
         try:
-            # Initialize browser with account-specific proxy
-            self._initialize_browser_if_needed(account)
-
-            try:
-                timestamp = time.strftime("%Y%m%d-%H%M%S")
-                screenshot_path = f"login1_{timestamp}.png"
-                self.driver.save_screenshot(screenshot_path)
-                print(f"Error screenshot saved to {screenshot_path}")
-            except Exception as screenshot_error:
-                print(f"Failed to take error screenshot: {screenshot_error}")
-            
-            # Always login before placing bet
+            # Always login before placing bet (this will also initialize browser if needed)
             print("Logging in before placing bet...")
             login_success = self.__do_login_for_account(account)
             if not login_success:
@@ -2616,7 +2644,7 @@ class BetEngine(WebsiteOpener):
             self._initialize_browser_if_needed(test_data["accounts"][0])
             print(f"Navigating to: {bet_url}")
             self.open_url(bet_url)
-            time.sleep(3)
+            time.sleep(5)
             
             # Test the new selector system
             market_element = self.__get_market_selector(line_type, outcome, points, is_first_half=False)
