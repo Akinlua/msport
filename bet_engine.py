@@ -2130,7 +2130,7 @@ class BetEngine(WebsiteOpener):
             # Find 1x2 market
             for market in markets:
                 market_desc = market.get("description", "").lower()
-                print(f"Checking market: '{market_desc}' against target: '{moneyline_market.lower()}'")
+                # print(f"Checking market: '{market_desc}' against target: '{moneyline_market.lower()}'")
                 
                 if market_desc == moneyline_market.lower():
                     # Map outcome to MSport format
@@ -2189,7 +2189,7 @@ class BetEngine(WebsiteOpener):
             
             for market in markets:
                 market_desc = market.get("description", "").lower()
-                print(f"Checking market: '{market_desc}' against target: '{total_market.lower()}'")
+                # print(f"Checking market: '{market_desc}' against target: '{total_market.lower()}'")
                 
                 if market_desc == total_market.lower():
                     for market_outcome in market.get("outcomes", []):
@@ -2257,7 +2257,7 @@ class BetEngine(WebsiteOpener):
                 
                 for market in markets:
                     market_desc = market.get("description", "").lower()
-                    print(f"Checking market: '{market_desc}' against target: '{dnb_market_name}'")
+                    # print(f"Checking market: '{market_desc}' against target: '{dnb_market_name}'")
                     
                     if market_desc == dnb_market_name:
                         # Find matching outcome
@@ -2320,7 +2320,7 @@ class BetEngine(WebsiteOpener):
             
             for market in markets:
                 market_desc = market.get("description", "").lower()
-                print(f"Checking market: '{market_desc}' against target: '{spread_market.lower()}'")
+                # print(f"Checking market: '{market_desc}' against target: '{spread_market.lower()}'")
                 
                 if market_desc == spread_market.lower():
                     for market_outcome in market.get("outcomes", []):
