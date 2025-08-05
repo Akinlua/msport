@@ -7,13 +7,58 @@ Tests both login functionality and bet placement
 import os
 import json
 import time
+import logging
 from bet_engine import BetEngine
+
+# Set up logging for tests
+def setup_test_logging():
+    """Set up structured logging for the test suite"""
+    # Create formatters
+    detailed_formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    simple_formatter = logging.Formatter(
+        '%(asctime)s - %(levelname)s - %(message)s'
+    )
+    
+    # Create handlers
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(simple_formatter)
+    
+    # File handlers for different components
+    test_handler = logging.FileHandler('logs/tests.log')
+    test_handler.setLevel(logging.DEBUG)
+    test_handler.setFormatter(detailed_formatter)
+    
+    error_handler = logging.FileHandler('logs/errors.log')
+    error_handler.setLevel(logging.ERROR)
+    error_handler.setFormatter(detailed_formatter)
+    
+    # Create loggers
+    test_logger = logging.getLogger('tests')
+    test_logger.setLevel(logging.DEBUG)
+    test_logger.addHandler(test_handler)
+    test_logger.addHandler(console_handler)
+    
+    error_logger = logging.getLogger('test_errors')
+    error_logger.setLevel(logging.ERROR)
+    error_logger.addHandler(error_handler)
+    error_logger.addHandler(console_handler)
+    
+    return test_logger, error_logger
+
+# Create logs directory if it doesn't exist
+os.makedirs('logs', exist_ok=True)
+
+# Initialize loggers
+test_logger, error_logger = setup_test_logging()
 
 def test_login():
     """Test login functionality"""
-    print("=" * 50)
-    print("TESTING MSPORT LOGIN")
-    print("=" * 50)
+    test_logger.info("=" * 50)
+    test_logger.info("TESTING MSPORT LOGIN")
+    test_logger.info("=" * 50)
     
     # Initialize bet engine
     bet_engine = BetEngine(
@@ -25,22 +70,22 @@ def test_login():
         # Test login for first account
         if bet_engine._BetEngine__accounts:
             account = bet_engine._BetEngine__accounts[0]
-            print(f"Testing login for account: {account.username}")
+            test_logger.info(f"Testing login for account: {account.username}")
             
             login_success = bet_engine._BetEngine__do_login_for_account(account)
             
             if login_success:
-                print("✅ Login successful!")
+                test_logger.info("✅ Login successful!")
                 return True
             else:
-                print("❌ Login failed!")
+                test_logger.info("❌ Login failed!")
                 return False
         else:
-            print("❌ No accounts configured in config.json")
+            test_logger.info("❌ No accounts configured in config.json")
             return False
             
     except Exception as e:
-        print(f"❌ Login test failed with error: {e}")
+        error_logger.error(f"❌ Login test failed with error: {e}")
         return False
     finally:
         # Cleanup
@@ -48,9 +93,9 @@ def test_login():
 
 def test_event_search():
     """Test event search functionality"""
-    print("\n" + "=" * 50)
-    print("TESTING EVENT SEARCH")
-    print("=" * 50)
+    test_logger.info("\n" + "=" * 50)
+    test_logger.info("TESTING EVENT SEARCH")
+    test_logger.info("=" * 50)
     
     bet_engine = BetEngine(
         config_file="config.json",
@@ -62,39 +107,40 @@ def test_event_search():
         home_team = "Corinthians"
         away_team = "Fortaleza"
         
-        print(f"Searching for event: {home_team} vs {away_team}")
+        test_logger.info(f"Searching for event: {home_team} vs {away_team}")
         event_id = bet_engine.search_event(home_team, away_team)
         
         if event_id:
-            print(f"✅ Event found! Event ID: {event_id}")
+            test_logger.info(f"✅ Event found! Event ID: {event_id}")
             
             # Test getting event details
-            print("Getting event details...")
+            test_logger.info("Getting event details...")
             event_details = bet_engine.get_event_details(event_id)
             
             if event_details:
-                print(f"✅ Event details retrieved!")
-                print(f"Event: {event_details.get('homeTeam')} vs {event_details.get('awayTeam')}")
-                print(f"Markets available: {len(event_details.get('markets', []))}")
+                test_logger.info(f"✅ Event details retrieved!")
+                test_logger.info(f"Event: {event_details.get('homeTeam')} vs {event_details.get('awayTeam')}")
+                test_logger.info(f"Markets available: {len(event_details.get('markets', []))}")
                 return True, event_details
             else:
+                test_logger.info("❌ Failed to get event details")
                 print("❌ Failed to get event details")
                 return False, None
         else:
-            print("❌ Event not found!")
+            test_logger.info("❌ Event not found!")
             return False, None
             
     except Exception as e:
-        print(f"❌ Event search failed with error: {e}")
+        error_logger.error(f"❌ Event search failed with error: {e}")
         return False, None
     finally:
         bet_engine.cleanup()
 
 def test_market_finding(event_details):
     """Test market finding functionality"""
-    print("\n" + "=" * 50)
-    print("TESTING MARKET FINDING")
-    print("=" * 50)
+    test_logger.info("\n" + "=" * 50)
+    test_logger.info("TESTING MARKET FINDING")
+    test_logger.info("=" * 50)
     
     bet_engine = BetEngine(config_file="config.json")
     
@@ -122,7 +168,7 @@ def test_market_finding(event_details):
         ]
         
         for test_case in test_cases:
-            print(f"\nTesting: {test_case['description']}")
+            test_logger.info(f"\nTesting: {test_case['description']}")
             
             outcome_id, odds, adjusted_points = bet_engine.find_market_bet_code_with_points(
                 event_details,
@@ -136,14 +182,14 @@ def test_market_finding(event_details):
             )
             
             if outcome_id and odds:
-                print(f"✅ Market found! Outcome ID: {outcome_id}, Odds: {odds}, Points: {adjusted_points}")
+                test_logger.info(f"✅ Market found! Outcome ID: {outcome_id}, Odds: {odds}, Points: {adjusted_points}")
             else:
-                print(f"❌ Market not found for {test_case['description']}")
+                test_logger.info(f"❌ Market not found for {test_case['description']}")
         
         return True
         
     except Exception as e:
-        print(f"❌ Market finding test failed with error: {e}")
+        error_logger.error(f"❌ Market finding test failed with error: {e}")
         return False
 
 def test_bet_placement():

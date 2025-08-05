@@ -7,6 +7,7 @@ import requests
 import dotenv
 import threading
 import queue
+import logging
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.support.ui import WebDriverWait
@@ -19,6 +20,68 @@ import math
 from captcha_solver import CaptchaSolver
 
 dotenv.load_dotenv()
+
+# Set up logging
+def setup_logging():
+    """Set up structured logging for the betting system"""
+    # Create formatters
+    detailed_formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    simple_formatter = logging.Formatter(
+        '%(asctime)s - %(levelname)s - %(message)s'
+    )
+    
+    # Create handlers
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(simple_formatter)
+    
+    # File handlers for different components
+    bet_handler = logging.FileHandler('logs/betting.log')
+    bet_handler.setLevel(logging.DEBUG)
+    bet_handler.setFormatter(detailed_formatter)
+    
+    odds_handler = logging.FileHandler('logs/odds.log')
+    odds_handler.setLevel(logging.DEBUG)
+    odds_handler.setFormatter(detailed_formatter)
+    
+    auth_handler = logging.FileHandler('logs/auth.log')
+    auth_handler.setLevel(logging.DEBUG)
+    auth_handler.setFormatter(detailed_formatter)
+    
+    error_handler = logging.FileHandler('logs/errors.log')
+    error_handler.setLevel(logging.ERROR)
+    error_handler.setFormatter(detailed_formatter)
+    
+    # Create loggers
+    bet_logger = logging.getLogger('betting')
+    bet_logger.setLevel(logging.DEBUG)
+    bet_logger.addHandler(bet_handler)
+    bet_logger.addHandler(console_handler)
+    
+    odds_logger = logging.getLogger('odds')
+    odds_logger.setLevel(logging.DEBUG)
+    odds_logger.addHandler(odds_handler)
+    odds_logger.addHandler(console_handler)
+    
+    auth_logger = logging.getLogger('auth')
+    auth_logger.setLevel(logging.DEBUG)
+    auth_logger.addHandler(auth_handler)
+    auth_logger.addHandler(console_handler)
+    
+    error_logger = logging.getLogger('errors')
+    error_logger.setLevel(logging.ERROR)
+    error_logger.addHandler(error_handler)
+    error_logger.addHandler(console_handler)
+    
+    return bet_logger, odds_logger, auth_logger, error_logger
+
+# Create logs directory if it doesn't exist
+os.makedirs('logs', exist_ok=True)
+
+# Initialize loggers
+bet_logger, odds_logger, auth_logger, error_logger = setup_logging()
 
 class BetAccount:
     """
@@ -43,8 +106,8 @@ class BetAccount:
         self.current_bets = max(0, self.current_bets - 1)
         
     def can_place_bet(self):
-        # print(f"Account {self.username} can place bet: {self.active} {self.cookie_jar is not None} {self.current_bets < self.max_concurrent_bets} {self.balance >= self.min_balance}")
-        # print(f"current bets: {self.current_bets} max concurrent bets: {self.max_concurrent_bets} balance: {self.balance} min balance: {self.min_balance}")
+        # auth_logger.debug(f"Account {self.username} can place bet: {self.active} {self.cookie_jar is not None} {self.current_bets < self.max_concurrent_bets} {self.balance >= self.min_balance}")
+        # auth_logger.debug(f"current bets: {self.current_bets} max concurrent bets: {self.max_concurrent_bets} balance: {self.balance} min balance: {self.min_balance}")
         return (self.active and 
                 self.current_bets < self.max_concurrent_bets)
         
@@ -85,13 +148,13 @@ class BetEngine(WebsiteOpener):
                  min_ev=float(os.getenv("MIN_EV", "0")),
                  config_file="config.json",
                  skip_initial_login=False):
-        print(f"Initializing BetEngine with min_ev: {min_ev}")
+        bet_logger.info(f"Initializing BetEngine with min_ev: {min_ev}")
         # Only initialize browser if needed for certain operations
         self.__browser_initialized = False
         self.__browser_open = False
         self.__headless = headless
         self.__skip_initial_login = skip_initial_login
-        # print(f"BetEngine initialized with headless: {headless}, skip_initial_login: {skip_initial_login}")
+        # bet_logger.debug(f"BetEngine initialized with headless: {headless}, skip_initial_login: {skip_initial_login}")
         self.__bet_api_host = bet_api_host
         self.__bet_host = bet_host
         self.__min_ev = min_ev
@@ -125,32 +188,32 @@ class BetEngine(WebsiteOpener):
         if (self.__browser_initialized and 
             current_proxy != target_proxy and 
             self.__config.get("use_proxies", False)):
-            # print(f"Proxy change detected: {current_proxy} -> {target_proxy}")
-            # print("Cleaning up browser to switch proxy...")
+            # bet_logger.debug(f"Proxy change detected: {current_proxy} -> {target_proxy}")
+            # bet_logger.debug("Cleaning up browser to switch proxy...")
             self._cleanup_browser_for_proxy_switch()
         
         if not self.__browser_initialized:
-            print("Initializing browser...")
+            bet_logger.info("Initializing browser...")
             
             # Get proxy from the specified account or first available account if configured
             proxy = target_proxy
             if proxy:
-                print(f"Using proxy: {proxy}")
+                bet_logger.info(f"Using proxy: {proxy}")
                 if account:
-                    print(f"  └─ From account: {account.username}")
+                    bet_logger.debug(f"  └─ From account: {account.username}")
                 else:
-                    print(f"  └─ From fallback account")
+                    bet_logger.debug(f"  └─ From fallback account")
             else:
                 if self.__config.get("use_proxies", False):
-                    print("Proxy usage enabled but no proxy found in accounts")
+                    bet_logger.warning("Proxy usage enabled but no proxy found in accounts")
                 else:
-                    print("Proxy usage disabled in config")
+                    bet_logger.debug("Proxy usage disabled in config")
             
             super().__init__(self.__headless, proxy)
             self.__browser_initialized = True
             self.__browser_open = True
             self._current_proxy = proxy  # Store current proxy for future comparison
-            print("Browser initialized")
+            bet_logger.info("Browser initialized")
             
             # Check IP address if using proxy
             if proxy:
@@ -163,17 +226,17 @@ class BetEngine(WebsiteOpener):
         """Clean up the current browser instance to allow for proxy switching"""
         try:
             if hasattr(self, 'driver') and self.driver:
-                print("Closing current browser for proxy switch...")
+                bet_logger.info("Closing current browser for proxy switch...")
                 self.driver.quit()
                 self.driver = None
             
             self.__browser_initialized = False
             self.__browser_open = False
             self._current_proxy = None
-            print("Browser cleanup completed")
+            bet_logger.info("Browser cleanup completed")
             
         except Exception as e:
-            print(f"Error during browser cleanup: {e}")
+            error_logger.error(f"Error during browser cleanup: {e}")
             # Force reset the flags even if cleanup failed
             self.__browser_initialized = False
             self.__browser_open = False
@@ -220,9 +283,9 @@ class BetEngine(WebsiteOpener):
                 }
                 
                 
-            print(f"Loaded configuration from {config_file}")
+            bet_logger.info(f"Loaded configuration from {config_file}")
         except Exception as e:
-            print(f"Error loading config file: {e}")
+            error_logger.error(f"Error loading config file: {e}")
             # Create default config
             self.__config = {
                 "accounts": [],
@@ -281,36 +344,36 @@ class BetEngine(WebsiteOpener):
                     min_balance=account_data.get("min_balance", 100),
                     proxy=account_data.get("proxy")
                 ))
-                print(f"Added account: {account_data.get('username')}")
+                auth_logger.info(f"Added account: {account_data.get('username')}")
                 
         # Ensure we have at least one account
         if not self.__accounts:
             raise ValueError("No betting accounts configured. Please set MSPORT_USERNAME and MSPORT_PASSWORD environment variables or configure accounts in config.json")
             
-        print(f"Set up {len(self.__accounts)} betting accounts")
+        bet_logger.info(f"Set up {len(self.__accounts)} betting accounts")
         
         # Try to login to accounts for initial setup, but don't fail if login fails
         if self.__accounts and not self.__skip_initial_login:
-            print("Attempting initial login for all accounts...")
+            auth_logger.info("Attempting initial login for all accounts...")
             try:
                 for account in self.__accounts:
                     try:
                         self.__do_login_for_account(account)
-                        print(f"Successfully logged in account: {account.username}")
+                        auth_logger.info(f"Successfully logged in account: {account.username}")
                     except Exception as e:
-                        print(f"Failed to login account {account.username} during setup: {e}")
-                        print("Account will be available for retry later")
+                        error_logger.error(f"Failed to login account {account.username} during setup: {e}")
+                        auth_logger.warning("Account will be available for retry later")
                         # Continue with other accounts instead of crashing
                         continue
             finally:
                 # Close browser after all login attempts are complete
                 if self.__browser_initialized:
-                    print("Closing browser after account setup...")
+                    bet_logger.info("Closing browser after account setup...")
                     self.cleanup()
         elif self.__skip_initial_login:
-            print("Skipping initial login as requested")
+            auth_logger.info("Skipping initial login as requested")
         else:
-            print("No accounts configured for initial login")
+            auth_logger.warning("No accounts configured for initial login")
 
             
     def __start_bet_worker(self):
@@ -332,7 +395,7 @@ class BetEngine(WebsiteOpener):
                 self.__bet_queue.task_done()
                 
             except Exception as e:
-                print(f"Error in bet worker thread: {e}")
+                error_logger.error(f"Error in bet worker thread: {e}")
                 
             # Small sleep to prevent CPU hogging
             time.sleep(0.1)
@@ -355,14 +418,14 @@ class BetEngine(WebsiteOpener):
                 if "ip" in ip_data:
                     ip_address = ip_data["ip"]
                     if using_proxy:
-                        print(f"✅ Using proxy - Current IP address: {ip_address} {account.username} {account.proxy}")
+                        auth_logger.info(f"✅ Using proxy - Current IP address: {ip_address} {account.username} {account.proxy}")
                     else:
-                        print(f"Current IP address (no proxy): {ip_address}")
+                        auth_logger.info(f"Current IP address (no proxy): {ip_address}")
                     return ip_address
-            print("Failed to get IP address")
+            auth_logger.warning("Failed to get IP address")
             return None
         except Exception as e:
-            print(f"Error checking IP address: {e}")
+            error_logger.error(f"Error checking IP address: {e}")
             return None
             
     def __fetch_account_balance(self, account):
@@ -377,7 +440,7 @@ class BetEngine(WebsiteOpener):
         """
         try:
             if not account.cookie_jar:
-                print(f"No cookies available for account {account.username}, cannot fetch balance")
+                auth_logger.warning(f"No cookies available for account {account.username}, cannot fetch balance")
                 return 0
                 
             balance_url = f"{self.__bet_host}/api/ng/pocket/financialAccounts/balance"
@@ -406,23 +469,23 @@ class BetEngine(WebsiteOpener):
                     
                     # Calculate real balance as avlBal / bizCode
                     real_balance = avl_bal / biz_code
-                    print(f"Account {account.username} balance: {real_balance:.2f} (avlBal: {avl_bal}, bizCode: {biz_code})")
+                    auth_logger.info(f"Account {account.username} balance: {real_balance:.2f} (avlBal: {avl_bal}, bizCode: {biz_code})")
                     
                     return real_balance
                 else:
-                    print(f"Invalid balance response for account {account.username}: {balance_data}")
+                    auth_logger.warning(f"Invalid balance response for account {account.username}: {balance_data}")
                     return 0
             else:
-                print(f"Failed to fetch balance for account {account.username}: HTTP {response.status_code}")
+                auth_logger.error(f"Failed to fetch balance for account {account.username}: HTTP {response.status_code}")
                 return 0
                 
         except Exception as e:
-            print(f"Error fetching balance for account {account.username}: {e}")
+            error_logger.error(f"Error fetching balance for account {account.username}: {e}")
             return 0
 
     def __do_login_for_account(self, account):
         """Log in to MSport website with a specific account using selenium"""
-        print(f"Logging in to MSport with account: {account.username}")
+        auth_logger.info(f"Logging in to MSport with account: {account.username}")
         
         if not account.username or not account.password:
             raise ValueError("MSport username or password not found for account")
@@ -446,7 +509,7 @@ class BetEngine(WebsiteOpener):
                 balance_element = WebDriverWait(self.driver, 5).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, ".account--balance.account-item.tw-text-yellow"))
                 )
-                print(f"Already logged in for account: {account.username}")
+                auth_logger.info(f"Already logged in for account: {account.username}")
                 
                 # Get cookies from selenium
                 selenium_cookies = self.driver.get_cookies()
@@ -455,7 +518,7 @@ class BetEngine(WebsiteOpener):
                 # Fetch account balance after successful login
                 balance = self.__fetch_account_balance(account)
                 account.balance = balance
-                print(f"Updated account balance: {balance:.2f}")
+                auth_logger.info(f"Updated account balance: {balance:.2f}")
             
                 # If this is the first account, also store cookies in the class for search functionality
                 if self.__accounts and account == self.__accounts[0]:
@@ -464,17 +527,17 @@ class BetEngine(WebsiteOpener):
                 return True
                 
             except TimeoutException:
-                print(f"Not logged in, proceeding with login process for account: {account.username}")
+                auth_logger.info(f"Not logged in, proceeding with login process for account: {account.username}")
                 # Continue with login process
             except Exception as e:
-                print(f"Error checking login status: {e}")
+                auth_logger.warning(f"Error checking login status: {e}")
                 # Continue with login process
             
             # Navigate to MSport login page
             login_url = f"{self.__bet_host}"
             self.driver.get(login_url)
             # time.sleep(3)  # Give page time to load
-            print(f"Navigated to login page: {login_url}")
+            auth_logger.info(f"Navigated to login page: {login_url}")
             
             # Check and solve CAPTCHA if present
             # if captcha_solver:
@@ -509,7 +572,7 @@ class BetEngine(WebsiteOpener):
             )
             phone_input.clear()
             phone_input.send_keys(account.username)
-            print(f"📱 Entered phone number: {account.username}")
+            auth_logger.info(f"📱 Entered phone number: {account.username}")
             
             # Find password input
             password_input = WebDriverWait(self.driver, 10).until(
@@ -517,14 +580,14 @@ class BetEngine(WebsiteOpener):
             )
             password_input.clear()
             password_input.send_keys(account.password)
-            print(f"🔑 Entered password")
+            auth_logger.info(f"🔑 Entered password")
             
             # Find and click login button
             login_button = WebDriverWait(self.driver, 10).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "button[type='submit'], .v-button.btn.login.popper-input-button"))
             )
             login_button.click()
-            print(f"🚀 Clicked login button")
+            auth_logger.info(f"🚀 Clicked login button")
             
             # Check for additional CAPTCHA after login attempt
             # time.sleep(10)
@@ -554,7 +617,7 @@ class BetEngine(WebsiteOpener):
                 self.driver.save_screenshot(screenshot_path)
                 # print(f"📸 Login status screenshot saved to {screenshot_path}")
             except Exception as screenshot_error:
-                print(f"Failed to take screenshot: {screenshot_error}")
+                error_logger.error(f"Failed to take screenshot: {screenshot_error}")
 
             # time.sleep(5000)
             
@@ -569,7 +632,7 @@ class BetEngine(WebsiteOpener):
                         EC.url_contains("sports")
                     )
                 )
-                print(f"Login successful for account: {account.username}")
+                auth_logger.info(f"Login successful for account: {account.username}")
                 
                 # Get cookies from selenium
                 selenium_cookies = self.driver.get_cookies()
@@ -578,7 +641,7 @@ class BetEngine(WebsiteOpener):
                 # Fetch account balance after successful login
                 balance = self.__fetch_account_balance(account)
                 account.balance = balance
-                print(f"Updated account balance: {balance:.2f}")
+                auth_logger.info(f"Updated account balance: {balance:.2f}")
             
                 # If this is the first account, also store cookies in the class for search functionality
                 if self.__accounts and account == self.__accounts[0]:
@@ -587,7 +650,7 @@ class BetEngine(WebsiteOpener):
                 return True
                     
             except TimeoutException:
-                print(f"Login may have failed for account: {account.username}")
+                auth_logger.warning(f"Login may have failed for account: {account.username}")
                 raise Exception("Login verification timeout")
                 
         except Exception as e:
@@ -596,10 +659,10 @@ class BetEngine(WebsiteOpener):
                 timestamp = time.strftime("%Y%m%d-%H%M%S")
                 screenshot_path = f"login_error_{timestamp}.png"
                 self.driver.save_screenshot(screenshot_path)
-                print(f"Login error screenshot saved to {screenshot_path}")
+                auth_logger.info(f"Login error screenshot saved to {screenshot_path}")
             except Exception as screenshot_error:
-                print(f"Failed to take error screenshot: {screenshot_error}")
-            print(f"❌ Login failed for account: {account.username}: {e}")
+                error_logger.error(f"Failed to take error screenshot: {screenshot_error}")
+            error_logger.error(f"❌ Login failed for account: {account.username}: {e}")
             raise
 
     def __search_event(self, home_team, away_team, pinnacle_start_time=None):
@@ -614,10 +677,10 @@ class BetEngine(WebsiteOpener):
         Returns:
         - event ID if found, None otherwise
         """
-        print(f"Searching for match: {home_team} vs {away_team}")
+        odds_logger.info(f"Searching for match: {home_team} vs {away_team}")
         if pinnacle_start_time:
             pinnacle_datetime = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(pinnacle_start_time)/1000))
-            print(f"Pinnacle start time: {pinnacle_datetime} (GMT)")
+            odds_logger.debug(f"Pinnacle start time: {pinnacle_datetime} (GMT)")
         
         # Try different search strategies
         search_strategies = [
@@ -640,7 +703,7 @@ class BetEngine(WebsiteOpener):
         variant_indicators = ["ladies", "women", "u21", "u-21", "u23", "u-23", "youth", "junior", "reserve", "b team"]
         
         for search_term in search_strategies:
-            print(f"Trying search term: {search_term}")
+            odds_logger.debug(f"Trying search term: {search_term}")
             
             try:
                 # MSport search endpoint
@@ -658,18 +721,18 @@ class BetEngine(WebsiteOpener):
                     "Operid": "2"
                 }
                 
-                print(f"Searching with URL: {search_url} and params: {params}")
+                odds_logger.debug(f"Searching with URL: {search_url} and params: {params}")
                 response = requests.get(search_url, params=params, headers=headers)
                 
-                # print(f"Response status: {response.status_code}")
+                odds_logger.debug(f"Response status: {response.status_code}")
                 # print(f"Response content: {response.text[:500]}...")
                 if response.status_code == 200:
                     try:
                         search_results = response.json()
                         # print(f"Search response: {search_results}")
                     except ValueError as e:
-                        print(f"Failed to parse JSON response: {e}")
-                        print(f"Response content: {response.text[:500]}...")
+                        error_logger.error(f"Failed to parse JSON response: {e}")
+                        odds_logger.debug(f"Response content: {response.text[:500]}...")
                         continue
                 
                     # Updated to handle the correct API response structure
@@ -695,7 +758,7 @@ class BetEngine(WebsiteOpener):
                                     break
                                 
                             if should_skip:
-                                print(f"Skipping variant team: {event_name}")
+                                odds_logger.debug(f"Skipping variant team: {event_name}")
                                 continue
                                 
                             # Calculate match score based on word matching
@@ -731,10 +794,10 @@ class BetEngine(WebsiteOpener):
                                         time_match_score = 10
                                         match_score += time_match_score
                                     else:
-                                        print(f"Time difference: {time_diff_hours:.2f} hours, not the right game")
+                                        odds_logger.debug(f"Time difference: {time_diff_hours:.2f} hours, not the right game")
                                             
                                 except Exception as e:
-                                    print(f"Error parsing time: {e}")
+                                    error_logger.error(f"Error parsing time: {e}")
                                 
                             # Add to potential matches if score is positive
                             if match_score > 0:
@@ -746,15 +809,15 @@ class BetEngine(WebsiteOpener):
                                 "home_team": event.get('homeTeam'),
                                 "away_team": event.get('awayTeam')
                             })
-                            print(f"Potential match: {event_name} (Score: {match_score})")
+                            odds_logger.debug(f"Potential match: {event_name} (Score: {match_score})")
                     else:
-                        print(f"No data found in search response for term: {search_term}")
+                        odds_logger.debug(f"No data found in search response for term: {search_term}")
                 else:
-                    print(f"Search request failed with status: {response.status_code}")
+                    odds_logger.warning(f"Search request failed with status: {response.status_code}")
                     # print(f"Response content: {response.text[:500]}...")
             
             except Exception as e:
-                print(f"Error searching for event with term '{search_term}': {e}")
+                error_logger.error(f"Error searching for event with term '{search_term}': {e}")
                 import traceback
                 traceback.print_exc()
                 continue
@@ -762,15 +825,15 @@ class BetEngine(WebsiteOpener):
         # If we have potential matches, return the one with the highest score
         if potential_matches:
             best_match = max(potential_matches, key=lambda x: x["score"])
-            print(f"Best match: {best_match['event_name']} (ID: {best_match['event_id']}, Score: {best_match['score']})")
+            odds_logger.info(f"Best match: {best_match['event_name']} (ID: {best_match['event_id']}, Score: {best_match['score']})")
             return best_match["event_id"]
         
-        print("No matching event found on MSport")
+        odds_logger.warning("No matching event found on MSport")
         return None
 
     def __get_event_details(self, event_id):
         """Get detailed information about an event from MSport"""
-        print(f"Getting details for event ID: {event_id}")
+        odds_logger.info(f"Getting details for event ID: {event_id}")
         
         try:
             # MSport event details endpoint
@@ -786,31 +849,31 @@ class BetEngine(WebsiteOpener):
                 "Operid": "2"
             }
             
-            print(f"Getting event details with URL: {details_url} and params: {params}")
+            odds_logger.debug(f"Getting event details with URL: {details_url} and params: {params}")
             response = requests.get(details_url, params=params, headers=headers)
             
-            print(f"Event details response status: {response.status_code}")
+            odds_logger.debug(f"Event details response status: {response.status_code}")
             if response.status_code == 200:
                 try:
                     event_details = response.json()
                     # print(f"Event details response: {event_details}")
                 except ValueError as e:
-                    print(f"Failed to parse JSON response for event details: {e}")
-                    print(f"Response content: {response.text[:500]}...")
+                    error_logger.error(f"Failed to parse JSON response for event details: {e}")
+                    odds_logger.debug(f"Response content: {response.text[:500]}...")
                     return None
                 
                 if "data" in event_details:
                     return event_details["data"]
                 else:
-                    print(f"No 'data' field in event details response")
+                    odds_logger.warning(f"No 'data' field in event details response")
                     return None
             else:
-                print(f"Failed to get event details: HTTP {response.status_code}")
-                print(f"Response content: {response.text[:500]}...")
+                odds_logger.error(f"Failed to get event details: HTTP {response.status_code}")
+                odds_logger.debug(f"Response content: {response.text[:500]}...")
                 return None
             
         except Exception as e:
-            print(f"Error getting event details: {e}")
+            error_logger.error(f"Error getting event details: {e}")
             import traceback
             traceback.print_exc()
             return None
@@ -830,11 +893,11 @@ class BetEngine(WebsiteOpener):
             away_team_formatted = away_team.replace(" ", "_")
             
             bet_url = f"{self.__bet_host}/ng/web/sports/Soccer/{home_team_formatted}/{away_team_formatted}/{event_id}"
-            print(f"Generated MSport bet URL: {bet_url}")
+            bet_logger.info(f"Generated MSport bet URL: {bet_url}")
             return bet_url
             
         except Exception as e:
-            print(f"Error generating MSport bet URL: {e}")
+            error_logger.error(f"Error generating MSport bet URL: {e}")
             return None
 
     def __place_bet_with_selenium(self, account, bet_url, market_type, outcome, odds, stake, points=None, is_first_half=False):
@@ -856,25 +919,25 @@ class BetEngine(WebsiteOpener):
         """
         try:
             # Always login before placing bet (this will also initialize browser if needed)
-            print("Logging in before placing bet...")
+            bet_logger.info("Logging in before placing bet...")
             login_success = self.__do_login_for_account(account)
             if not login_success:
-                print("Login failed, cannot place bet")
+                bet_logger.error("Login failed, cannot place bet")
                 return False
             
-            print(f"Navigating to betting page: {bet_url}")
+            bet_logger.info(f"Navigating to betting page: {bet_url}")
             self.open_url(bet_url)
             # time.sleep(3)
             
             # Find and click the market/outcome
             market_element = self.__get_market_selector(market_type, outcome, points, is_first_half)
-            # print(f"Market element: {market_element}")
+            # bet_logger.debug(f"Market element: {market_element}")
             if not market_element:
-                print("Could not find market element")
+                bet_logger.error("Could not find market element")
                 return False
             
             try:
-                print(f"Found market element for: {market_type} - {outcome} - {points}")
+                bet_logger.info(f"Found market element for: {market_type} - {outcome} - {points}")
                 
                 # Verify odds before placing bet
                 try:
@@ -888,13 +951,13 @@ class BetEngine(WebsiteOpener):
                         odds_diff = abs(actual_odds - odds)
                         
                         if odds_diff > 0.1:  # Allow 0.1 difference
-                            print(f"⚠️ Odds mismatch! Expected: {odds}, Actual: {actual_odds}")
-                            print("Bet cancelled due to odds change")
+                            bet_logger.error(f"⚠️ Odds mismatch! Expected: {odds}, Actual: {actual_odds}")
+                            bet_logger.error("Bet cancelled due to odds change")
                             return False
                         else:
-                            print(f"✅ Odds verified: {actual_odds} (expected: {odds})")
+                            bet_logger.info(f"✅ Odds verified: {actual_odds} (expected: {odds})")
                 except Exception as e:
-                    print(f"Could not verify odds: {e}")
+                    bet_logger.error(f"Could not verify odds: {e}")
                 
                 # Simple direct clicking approach - no scrolling
                 try:
@@ -905,32 +968,32 @@ class BetEngine(WebsiteOpener):
                     
                     # Direct click on the element
                     market_element.click()
-                    print(f"Clicked on market: {market_type} - {outcome} - {points}")
+                    bet_logger.info(f"Clicked on market: {market_type} - {outcome} - {points}")
                     # time.sleep(2)
                     
                 except Exception as click_error:
-                    print(f"Direct click failed, trying JavaScript click: {click_error}")
+                    bet_logger.error(f"Direct click failed, trying JavaScript click: {click_error}")
                     
                     # Fallback to JavaScript click
                     try:
                         self.driver.execute_script("arguments[0].click();", market_element)
-                        print(f"JavaScript clicked on market: {market_type} - {outcome} - {points}")
+                        bet_logger.info(f"JavaScript clicked on market: {market_type} - {outcome} - {points}")
                         # time.sleep(2)
                     except Exception as js_error:
-                        print(f"JavaScript click also failed: {js_error}")
+                        bet_logger.error(f"JavaScript click also failed: {js_error}")
                         
                         # Last resort: try ActionChains
                         try:
                             actions = ActionChains(self.driver)
                             actions.move_to_element(market_element).click().perform()
-                            print(f"ActionChains clicked on market: {market_type} - {outcome} - {points}")
+                            bet_logger.info(f"ActionChains clicked on market: {market_type} - {outcome} - {points}")
                             # time.sleep(2)
                         except Exception as action_error:
-                            print(f"All click methods failed: {action_error}")
+                            bet_logger.error(f"All click methods failed: {action_error}")
                             raise Exception("All click methods failed")
                 
             except Exception as e:
-                    print(f"Could not click market element: {e}")
+                    bet_logger.error(f"Could not click market element: {e}")
                     return False
             
             # Enter stake amount
@@ -970,10 +1033,10 @@ class BetEngine(WebsiteOpener):
                 result = self.driver.execute_script(stake_js_script, str(10))
                 
                 if result:
-                    print(f"✅ Successfully entered stake: 10 using JavaScript")
+                    bet_logger.info(f"✅ Successfully entered stake: 10 using JavaScript")
                     # time.sleep(1)
                 else:
-                    print("❌ JavaScript stake input failed, trying fallback methods")
+                    bet_logger.error("❌ JavaScript stake input failed, trying fallback methods")
                     
                     # Fallback to Selenium methods if JavaScript fails
                     stake_input = None
@@ -989,24 +1052,24 @@ class BetEngine(WebsiteOpener):
                             stake_input = WebDriverWait(self.driver, 5).until(
                                 EC.presence_of_element_located((By.CSS_SELECTOR, selector))
                             )
-                            print(f"Found stake input using fallback selector: {selector}")
+                            bet_logger.info(f"Found stake input using fallback selector: {selector}")
                             break
                         except TimeoutException:
                             continue
                     
                     if not stake_input:
-                        print("Could not find stake input field")
+                        bet_logger.error("Could not find stake input field")
                         return False
                     
                     # Clear and enter stake with Selenium
                     stake_input.clear()
                     # time.sleep(0.5)
                     stake_input.send_keys(str(10))
-                    print(f"Entered stake using Selenium fallback: 10")
+                    bet_logger.info(f"Entered stake using Selenium fallback: 10")
                     # time.sleep(1)
                 
             except Exception as e:
-                print(f"Error entering stake: {e}")
+                bet_logger.error(f"Error entering stake: {e}")
                 return False
             
             # Place the bet
@@ -1018,10 +1081,10 @@ class BetEngine(WebsiteOpener):
                     place_bet_button = WebDriverWait(self.driver, 10).until(
                         EC.element_to_be_clickable((By.CSS_SELECTOR, "button.v-button.m-place-btn"))
                     )
-                    print("Found place bet button using specific CSS class")
+                    bet_logger.info("Found place bet button using specific CSS class")
                     
                 except Exception as e:
-                    print(f"Could not find bet button with specific class: {e}")
+                    bet_logger.error(f"Could not find bet button with specific class: {e}")
                     
                     # Fallback selectors
                     fallback_button_selectors = [
@@ -1046,13 +1109,13 @@ class BetEngine(WebsiteOpener):
                                 place_bet_button = WebDriverWait(self.driver, 5).until(
                                     EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
                                 )
-                            print(f"Found bet button using fallback selector: {selector}")
+                            bet_logger.info(f"Found bet button using fallback selector: {selector}")
                             break
                         except TimeoutException:
                             continue
                 
                 if not place_bet_button:
-                    print("Could not find place bet button")
+                    bet_logger.error("Could not find place bet button")
                     return False
                 
                 # Improved scrolling and clicking approach for bet button (same as market selector)
@@ -1075,25 +1138,25 @@ class BetEngine(WebsiteOpener):
                     # Try JavaScript click if regular click fails
                     try:
                         place_bet_button.click()
-                        print("Clicked place bet button")
+                        bet_logger.info("Clicked place bet button")
                     except Exception as click_error:
-                        print(f"Regular click failed, trying JavaScript click: {click_error}")
+                        bet_logger.error(f"Regular click failed, trying JavaScript click: {click_error}")
                         self.driver.execute_script("arguments[0].click();", place_bet_button)
-                        print("JavaScript clicked place bet button")
+                        bet_logger.info("JavaScript clicked place bet button")
                     
                     # time.sleep(3)
                     
                 except Exception as scroll_click_error:
-                    print(f"Failed to scroll and click bet button: {scroll_click_error}")
+                    bet_logger.error(f"Failed to scroll and click bet button: {scroll_click_error}")
                     
                     # Last resort: try moving to element and clicking
                     try:
                         actions = ActionChains(self.driver)
                         actions.move_to_element(place_bet_button).click().perform()
-                        print("ActionChains clicked place bet button")
+                        bet_logger.info("ActionChains clicked place bet button")
                         # time.sleep(3)
                     except Exception as action_error:
-                        print(f"ActionChains also failed for bet button: {action_error}")
+                        bet_logger.error(f"ActionChains also failed for bet button: {action_error}")
                         raise Exception("All click methods failed for bet button")
                 
                 # Check for success confirmation
@@ -1118,7 +1181,7 @@ class BetEngine(WebsiteOpener):
                             continue
                     
                     if success_found:
-                        print("✅ Bet placed successfully!")
+                        bet_logger.info("✅ Bet placed successfully!")
                         return True
                     else:
                         # Take screenshot of failed bet state
@@ -1126,30 +1189,30 @@ class BetEngine(WebsiteOpener):
                             timestamp = time.strftime("%Y%m%d-%H%M%S")
                             screenshot_path = f"failed_bet_screenshot_{timestamp}.png"
                             self.driver.save_screenshot(screenshot_path)
-                            print(f"Failed bet screenshot saved to {screenshot_path}")
+                            bet_logger.info(f"Failed bet screenshot saved to {screenshot_path}")
                         except Exception as screenshot_error:
-                            print(f"Failed to take failed bet screenshot: {screenshot_error}")
-                        print("⚠️ No success confirmation found, bet may have failed")
+                            bet_logger.error(f"Failed to take failed bet screenshot: {screenshot_error}")
+                        bet_logger.warning("⚠️ No success confirmation found, bet may have failed")
                         return False
                 
                 except Exception as e:
-                    print(f"Error checking for success confirmation: {e}")
+                    bet_logger.error(f"Error checking for success confirmation: {e}")
                     return False
                     
             except Exception as e:
-                print(f"Error clicking place bet button: {e}")
+                bet_logger.error(f"Error clicking place bet button: {e}")
                 return False
                 
         except Exception as e:
-            print(f"Error placing bet with Selenium: {e}")
+            bet_logger.error(f"Error placing bet with Selenium: {e}")
             # Take screenshot of error state
             try:
                 timestamp = time.strftime("%Y%m%d-%H%M%S")
                 screenshot_path = f"error_screenshot_{timestamp}.png"
                 self.driver.save_screenshot(screenshot_path)
-                print(f"Error screenshot saved to {screenshot_path}")
+                bet_logger.info(f"Error screenshot saved to {screenshot_path}")
             except Exception as screenshot_error:
-                print(f"Failed to take error screenshot: {screenshot_error}")
+                bet_logger.error(f"Failed to take error screenshot: {screenshot_error}")
             import traceback
             traceback.print_exc()
             return False
@@ -1184,14 +1247,14 @@ class BetEngine(WebsiteOpener):
                     halftime_button.click()
                     # print("Clicked first half tab")
                 except Exception as click_error:
-                    print(f"Regular click failed, trying JavaScript click: {click_error}")
+                    bet_logger.error(f"Regular click failed, trying JavaScript click: {click_error}")
                     # Use JavaScript click as fallback
                     self.driver.execute_script("arguments[0].click();", halftime_button)
-                    print("JavaScript clicked first half tab")
+                    bet_logger.info("JavaScript clicked first half tab")
                 
                 time.sleep(2)
             except Exception as e:
-                print(f"Could not click first half tab: {e}")
+                bet_logger.error(f"Could not click first half tab: {e}")
                 return None
         
         # Get all market rows
@@ -1200,15 +1263,15 @@ class BetEngine(WebsiteOpener):
             try:
                 screenshot_path = f"market_search_{int(time.time())}.png"
                 self.driver.save_screenshot(screenshot_path)
-                print(f"Market search screenshot saved to {screenshot_path}")
+                bet_logger.info(f"Market search screenshot saved to {screenshot_path}")
             except Exception as screenshot_error:
-                print(f"Failed to take market search screenshot: {screenshot_error}")
+                bet_logger.error(f"Failed to take market search screenshot: {screenshot_error}")
             market_rows = self.driver.find_elements(By.CSS_SELECTOR, ".m-market-row.m-market-row--3")
             if not market_rows:
-                print("No market rows found")
+                bet_logger.warning("No market rows found")
                 return None
         except Exception as e:
-            print(f"Error finding market rows: {e}")
+            bet_logger.error(f"Error finding market rows: {e}")
             return None
         
         # 1X2 (Moneyline) - First div from the list
@@ -1228,7 +1291,7 @@ class BetEngine(WebsiteOpener):
             
             # Check if handicap is 0 - if so, use DNB (Draw No Bet) market instead
             if abs(float(points)) < 0.01:  # Using small threshold for floating point comparison
-                print(f"Handicap is 0, looking for DNB (Draw No Bet) market instead of Asian Handicap")
+                bet_logger.warning(f"Handicap is 0, looking for DNB (Draw No Bet) market instead of Asian Handicap")
                 return self.__find_dnb_outcome(outcome_lower, is_first_half)
             
             return self.__find_handicap_outcome(points, outcome_lower)
@@ -1247,7 +1310,7 @@ class BetEngine(WebsiteOpener):
         - Element or None if not found
         """
         if not market_row:
-            print("No 1X2 market row provided")
+            bet_logger.warning("No 1X2 market row provided")
             return None
             
         try:
@@ -1255,14 +1318,14 @@ class BetEngine(WebsiteOpener):
             outcome_divs = market_row.find_elements(By.CSS_SELECTOR, ".has-desc.m-outcome.multiple")
             
             if len(outcome_divs) < 3:
-                print(f"Expected 3 outcomes for 1X2, found {len(outcome_divs)}")
+                bet_logger.warning(f"Expected 3 outcomes for 1X2, found {len(outcome_divs)}")
                 return None
             
             # Map outcome to index: first=home, second=draw, third=away
             outcome_index = {"home": 0, "draw": 1, "away": 2}
             
             if outcome not in outcome_index:
-                print(f"Invalid 1X2 outcome: {outcome}")
+                bet_logger.error(f"Invalid 1X2 outcome: {outcome}")
                 return None
             
             target_div = outcome_divs[outcome_index[outcome]]
@@ -1271,14 +1334,14 @@ class BetEngine(WebsiteOpener):
             try:
                 odds_element = target_div.find_element(By.CSS_SELECTOR, ".odds")
                 odds_text = odds_element.text.strip()
-                print(f"Found 1X2 {outcome} with odds: {odds_text}")
+                bet_logger.info(f"Found 1X2 {outcome} with odds: {odds_text}")
                 return target_div
             except Exception as e:
-                print(f"Could not find odds in 1X2 outcome: {e}")
+                bet_logger.error(f"Could not find odds in 1X2 outcome: {e}")
                 return None
                 
         except Exception as e:
-            print(f"Error finding 1X2 outcome: {e}")
+            bet_logger.error(f"Error finding 1X2 outcome: {e}")
             return None
     
     def __find_total_outcome(self, target_points, outcome):
@@ -1297,7 +1360,7 @@ class BetEngine(WebsiteOpener):
             specifier_divs = self.driver.find_elements(By.CSS_SELECTOR, ".m-market-specifier")
             
             if not specifier_divs:
-                print("No market specifier divs found for totals")
+                bet_logger.warning("No market specifier divs found for totals")
                 return None
             
             # Use the first one for over/under
@@ -1327,7 +1390,7 @@ class BetEngine(WebsiteOpener):
                             betting_outcomes = [div for div in outcome_divs if div.find_elements(By.CSS_SELECTOR, ".odds")]
                             
                             if len(betting_outcomes) < 2:
-                                print(f"Expected 2 betting outcomes for totals, found {len(betting_outcomes)}")
+                                bet_logger.warning(f"Expected 2 betting outcomes for totals, found {len(betting_outcomes)}")
                                 continue
                             
                             # First is over, second is under
@@ -1337,21 +1400,21 @@ class BetEngine(WebsiteOpener):
                             try:
                                 odds_element = target_div.find_element(By.CSS_SELECTOR, ".odds")
                                 odds_text = odds_element.text.strip()
-                                print(f"Found total {outcome} {target_points} with odds: {odds_text}")
+                                bet_logger.info(f"Found total {outcome} {target_points} with odds: {odds_text}")
                                 return target_div
                             except Exception as e:
-                                print(f"Could not find odds in total outcome: {e}")
+                                bet_logger.error(f"Could not find odds in total outcome: {e}")
                                 continue
                                 
                 except Exception as e:
                     # Row doesn't match, continue to next
                     continue
                     
-            print(f"Could not find total market for {target_points} {outcome}")
+            bet_logger.warning(f"Could not find total market for {target_points} {outcome}")
             return None
             
         except Exception as e:
-            print(f"Error finding total outcome: {e}")
+            bet_logger.error(f"Error finding total outcome: {e}")
             return None
     
     def __find_handicap_outcome(self, target_points, outcome):
@@ -1370,7 +1433,7 @@ class BetEngine(WebsiteOpener):
             handicap_divs = self.driver.find_elements(By.CSS_SELECTOR, ".m-market-handicap")
             
             if not handicap_divs:
-                print("No handicap market divs found")
+                bet_logger.warning("No handicap market divs found")
                 return None
             
             # Use the first (or only) handicap div
@@ -1385,7 +1448,7 @@ class BetEngine(WebsiteOpener):
                     outcome_divs = row.find_elements(By.CSS_SELECTOR, ".has-desc.m-outcome.multiple")
                     
                     if len(outcome_divs) < 2:
-                        print(f"Expected 2 outcomes for handicap, found {len(outcome_divs)}")
+                        bet_logger.warning(f"Expected 2 outcomes for handicap, found {len(outcome_divs)}")
                         continue
                     
                     # First div is home, second is away
@@ -1408,10 +1471,10 @@ class BetEngine(WebsiteOpener):
                                 try:
                                     odds_element = target_div.find_element(By.CSS_SELECTOR, ".odds")
                                     odds_text = odds_element.text.strip()
-                                    print(f"Found handicap {outcome} {target_points} with odds: {odds_text}")
+                                    bet_logger.info(f"Found handicap {outcome} {target_points} with odds: {odds_text}")
                                     return target_div
                                 except Exception as e:
-                                    print(f"Could not find odds in handicap outcome: {e}")
+                                    bet_logger.error(f"Could not find odds in handicap outcome: {e}")
                                     continue
                                     
                     except Exception as e:
@@ -1422,11 +1485,11 @@ class BetEngine(WebsiteOpener):
                     # Row doesn't match, continue to next
                     continue
             
-            print(f"Could not find handicap market for {target_points} {outcome}")
+            bet_logger.warning(f"Could not find handicap market for {target_points} {outcome}")
             return None
             
         except Exception as e:
-            print(f"Error finding handicap outcome: {e}")
+            bet_logger.error(f"Error finding handicap outcome: {e}")
             return None
 
     def __find_dnb_outcome(self, outcome, is_first_half=False):
@@ -1445,7 +1508,7 @@ class BetEngine(WebsiteOpener):
             market_items = self.driver.find_elements(By.CSS_SELECTOR, ".m-market-item")
             
             if not market_items:
-                print("No market items found")
+                bet_logger.warning("No market items found")
                 return None
             
             # Look for DNB market item
@@ -1462,20 +1525,20 @@ class BetEngine(WebsiteOpener):
                         if is_first_half:
                             if "1st half" in market_name:
                                 dnb_market_item = market_item
-                                print(f"Found first half DNB market: {market_name}")
+                                bet_logger.info(f"Found first half DNB market: {market_name}")
                                 break
                         else:
                             # For normal matches, ensure "1st half" is NOT present
                             if "1st half" not in market_name:
                                 dnb_market_item = market_item
-                                print(f"Found normal DNB market: {market_name}")
+                                bet_logger.info(f"Found normal DNB market: {market_name}")
                                 break
                 except Exception as e:
                     # This market item doesn't have the expected structure, continue to next
                     continue
             
             if not dnb_market_item:
-                print("No DNB market item found")
+                bet_logger.warning("No DNB market item found")
                 return None
             
             # Now get the content div within this market item
@@ -1485,7 +1548,7 @@ class BetEngine(WebsiteOpener):
             outcome_divs = content_div.find_elements(By.CSS_SELECTOR, ".has-desc.m-outcome.multiple")
             
             if len(outcome_divs) < 2:
-                print(f"Expected 2 outcomes for DNB, found {len(outcome_divs)}")
+                bet_logger.warning(f"Expected 2 outcomes for DNB, found {len(outcome_divs)}")
                 return None
             
             # First div is home, second is away
@@ -1495,14 +1558,14 @@ class BetEngine(WebsiteOpener):
             try:
                 odds_element = target_div.find_element(By.CSS_SELECTOR, ".odds")
                 odds_text = odds_element.text.strip()
-                print(f"Found DNB {outcome} with odds: {odds_text}")
+                bet_logger.info(f"Found DNB {outcome} with odds: {odds_text}")
                 return target_div
             except Exception as e:
-                print(f"Could not find odds in DNB outcome: {e}")
+                bet_logger.error(f"Could not find odds in DNB outcome: {e}")
                 return None
             
         except Exception as e:
-            print(f"Error finding DNB outcome: {e}")
+            bet_logger.error(f"Error finding DNB outcome: {e}")
             return None
 
     def __place_bet_with_available_account(self, bet_data):
@@ -1524,7 +1587,7 @@ class BetEngine(WebsiteOpener):
             
             # Check if we've reached the global limit
             if total_current_bets >= max_total_bets:
-                print(f"Reached global limit of {max_total_bets} concurrent bets. Queuing bet.")
+                bet_logger.warning(f"Reached global limit of {max_total_bets} concurrent bets. Queuing bet.")
                 # Re-add to queue with a delay
                 threading.Timer(30.0, lambda: self.__bet_queue.put(bet_data)).start()
                 return False
@@ -1533,15 +1596,15 @@ class BetEngine(WebsiteOpener):
             any_bet_placed = False
             
             # Find all available accounts and place bets with each
-            print(f"Checking {len(self.__accounts)} accounts")
-            print(f"account names: {[account.username for account in self.__accounts]}")
+            bet_logger.info(f"Checking {len(self.__accounts)} accounts")
+            bet_logger.debug(f"account names: {[account.username for account in self.__accounts]}")
 
             for account in self.__accounts:
-                print(f"just checking account {account.username}")
+                bet_logger.debug(f"just checking account {account.username}")
             for account in self.__accounts:
-                print(f"Checking account {account.username}")
+                bet_logger.debug(f"Checking account {account.username}")
                 if account.can_place_bet():
-                    print(f"Account {account.username} can place bet")
+                    bet_logger.info(f"Account {account.username} can place bet")
                     # Check if login is needed
                     # if account.needs_login():
                     #     try:
@@ -1564,23 +1627,23 @@ class BetEngine(WebsiteOpener):
                     
                     if success:
                         account.decrement_bets()
-                        print(f"Bet placed successfully with account {account.username}")
+                        bet_logger.info(f"Bet placed successfully with account {account.username}")
                         any_bet_placed = True
                     else:
                         # If bet failed, decrement the bet counter
                         account.decrement_bets()
                 else:
-                    print(f"Account {account.username} cannot place bet")
+                    bet_logger.debug(f"Account {account.username} cannot place bet")
             
             if not any_bet_placed:
-                print("No available accounts to place bet. Queuing for retry.")
+                bet_logger.warning("No available accounts to place bet. Queuing for retry.")
                 # Re-add to queue with a delay
                 threading.Timer(60.0, lambda: self.__bet_queue.put(bet_data)).start()
                 return False
             
             return any_bet_placed
         except Exception as e:
-            print(f"Error in place_bet_with_available_account: {e}")
+            error_logger.error(f"Error in place_bet_with_available_account: {e}")
             # Close browser on error
             self.cleanup()
             raise
@@ -2123,7 +2186,7 @@ class BetEngine(WebsiteOpener):
             spread_market = "asian handicap"
             dnb_market = "dnb"
         
-        print(f"Looking for markets: moneyline='{moneyline_market}', total='{total_market}', spread='{spread_market}', dnb='{dnb_market}'")
+        odds_logger.info(f"Looking for markets: moneyline='{moneyline_market}', total='{total_market}', spread='{spread_market}', dnb='{dnb_market}'")
 
         # Handle MONEYLINE bets (1X2 in MSport)
         if line_type.lower() == "money_line":
