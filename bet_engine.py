@@ -291,6 +291,7 @@ class BetEngine(WebsiteOpener):
                 "accounts": [],
                 "max_total_concurrent_bets": 5,
                 "use_proxies": False,  # Global flag to enable/disable proxies
+                "immediate_bet_placement": True,  # Place bets immediately instead of queuing
                 "bet_settings": {
                     "min_ev": self.__min_ev,
                     "kelly_fraction": 0.3,
@@ -2107,6 +2108,15 @@ class BetEngine(WebsiteOpener):
             print(f"Calculating EV with adjusted points: {adjusted_points}")
             ev = self.__calculate_ev(bet_odds, modified_shaped_data)
             
+            # Log the current bet placement mode
+            placement_mode = self.get_bet_placement_mode()
+            bet_logger.info(f"Processing bet with {placement_mode} placement mode - EV: {ev:.2%}")
+            
+            # Check if EV meets minimum threshold
+            if ev < self.__min_ev:
+                bet_logger.info(f"EV {ev:.2%} below minimum threshold {self.__min_ev:.2%}, skipping bet")
+                return False
+            
             # Check Pinnacle odds for the specific outcome before placing bet
             decimal_prices = modified_shaped_data.get("_decimal_prices", {})
             outcome_key = modified_shaped_data.get("_outcome_key", "")
@@ -2469,32 +2479,60 @@ class BetEngine(WebsiteOpener):
 
     def __place_bet(self, event_details, line_type, outcome, odds, modified_shaped_data):
         """
-        Queue a bet for placement on MSport
+        Place a bet on MSport
         
         Parameters:
-        - event_details: The event details from MSport
-        - line_type: The type of bet (spread, moneyline, total)
-        - outcome: The outcome (home, away, draw, over, under)
+        - event_details: Event details from MSport
+        - line_type: Type of bet (money_line, total, spread)
+        - outcome: Outcome to bet on
         - odds: The decimal odds for the bet
         - modified_shaped_data: The modified shaped data for the bet
         
         Returns:
-        - True if bet was queued successfully
+        - True if bet was placed/queued successfully
         """
-        print(f"Queueing MSport bet: {line_type} - {outcome} with odds {odds}")
+        # Check if immediate bet placement is enabled
+        immediate_placement = self.__config.get("immediate_bet_placement", True)
         
-        # Add bet to queue
-        bet_data = {
-            "event_details": event_details,
-            "market_type": line_type,
-            "outcome": outcome,
-            "odds": odds,
-            "shaped_data": modified_shaped_data,
-            "timestamp": time.time()
-        }
-        
-        self.__bet_queue.put(bet_data)
-        return True  # Return True as the bet was queued successfully
+        if immediate_placement:
+            bet_logger.info(f"Placing MSport bet immediately: {line_type} - {outcome} with odds {odds}")
+            
+            # Create bet data
+            bet_data = {
+                "event_details": event_details,
+                "market_type": line_type,
+                "outcome": outcome,
+                "odds": odds,
+                "shaped_data": modified_shaped_data,
+                "timestamp": time.time()
+            }
+            
+            # Place bet immediately
+            try:
+                result = self.__place_bet_with_available_account(bet_data)
+                if result:
+                    bet_logger.info("Bet placed successfully")
+                else:
+                    bet_logger.warning("Bet placement failed")
+                return result
+            except Exception as e:
+                error_logger.error(f"Error placing bet immediately: {e}")
+                return False
+        else:
+            bet_logger.info(f"Queueing MSport bet: {line_type} - {outcome} with odds {odds}")
+            
+            # Add bet to queue
+            bet_data = {
+                "event_details": event_details,
+                "market_type": line_type,
+                "outcome": outcome,
+                "odds": odds,
+                "shaped_data": modified_shaped_data,
+                "timestamp": time.time()
+            }
+            
+            self.__bet_queue.put(bet_data)
+            return True  # Return True as the bet was queued successfully
 
     def __find_market_bet_code(self, event_details, line_type, points, outcome, is_first_half=False, sport_id=1, home_team=None, away_team=None):
         """
@@ -2781,6 +2819,64 @@ class BetEngine(WebsiteOpener):
         finally:
             # Clean up
             self.cleanup()
+
+    def get_bet_placement_mode(self):
+        """
+        Get the current bet placement mode
+        
+        Returns:
+        - 'immediate' if bets are placed immediately
+        - 'queued' if bets are queued for later placement
+        """
+        immediate_placement = self.__config.get("immediate_bet_placement", True)
+        return "immediate" if immediate_placement else "queued"
+    
+    def set_bet_placement_mode(self, immediate=True):
+        """
+        Set the bet placement mode
+        
+        Parameters:
+        - immediate: True for immediate placement, False for queued placement
+        """
+        self.__config["immediate_bet_placement"] = immediate
+        mode = "immediate" if immediate else "queued"
+        bet_logger.info(f"Bet placement mode changed to: {mode}")
+        
+        # Save config to file if it exists
+        try:
+            with open("config.json", "w") as f:
+                json.dump(self.__config, f, indent=4)
+            bet_logger.info("Configuration saved to config.json")
+        except Exception as e:
+            error_logger.error(f"Failed to save configuration: {e}")
+    
+    def get_queue_size(self):
+        """
+        Get the current size of the bet queue
+        
+        Returns:
+        - Number of bets in the queue
+        """
+        return self.__bet_queue.qsize()
+    
+    def clear_bet_queue(self):
+        """
+        Clear all bets from the queue
+        
+        Returns:
+        - Number of bets that were cleared
+        """
+        cleared_count = 0
+        while not self.__bet_queue.empty():
+            try:
+                self.__bet_queue.get_nowait()
+                self.__bet_queue.task_done()
+                cleared_count += 1
+            except queue.Empty:
+                break
+        
+        bet_logger.info(f"Cleared {cleared_count} bets from queue")
+        return cleared_count
 
 if __name__ == "__main__":
     """Main Application
