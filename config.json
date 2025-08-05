@@ -19,6 +19,7 @@
     ],
     "max_total_concurrent_bets": 20,
     "use_proxies": true,
+    "immediate_bet_placement": true,
     "browser": {
         "use_existing": true,
         "debug_port": 9222
