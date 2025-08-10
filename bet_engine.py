@@ -185,6 +185,8 @@ class BetEngine(WebsiteOpener):
                         break
         
         # If browser is initialized but we need a different proxy, clean up first
+        bet_logger.debug(f"self.__browser_initialized: {self.__browser_initialized}")
+        bet_logger.debug(f"current_proxy: {current_proxy} target_proxy: {target_proxy}")
         if (self.__browser_initialized and 
             current_proxy != target_proxy and 
             self.__config.get("use_proxies", False)):
@@ -484,7 +486,7 @@ class BetEngine(WebsiteOpener):
             error_logger.error(f"Error fetching balance for account {account.username}: {e}")
             return 0
 
-    def __do_login_for_account(self, account):
+    def __do_login_for_account(self, account, _retry=False):
         """Log in to MSport website with a specific account using selenium"""
         auth_logger.info(f"Logging in to MSport with account: {account.username}")
         
@@ -539,33 +541,6 @@ class BetEngine(WebsiteOpener):
             self.driver.get(login_url)
             # time.sleep(3)  # Give page time to load
             auth_logger.info(f"Navigated to login page: {login_url}")
-            
-            # Check and solve CAPTCHA if present
-            # if captcha_solver:
-            #     print("🔍 Checking for Cloudflare Turnstile CAPTCHA...")
-            #     captcha_solved = captcha_solver.solve_turnstile_captcha(
-            #         driver=self.driver,
-            #         page_url=login_url,
-            #         max_retries=captcha_config.get("max_retries", 3)
-            #     )
-                
-            #     if not captcha_solved:
-            #         print("❌ Failed to solve CAPTCHA, login cannot proceed")
-            #         raise Exception("CAPTCHA solving failed")
-                
-            #     # Wait for CAPTCHA completion and page to be ready
-            #     if not captcha_solver.wait_for_captcha_completion(self.driver, timeout=captcha_config.get("timeout", 30)):
-            #         print("❌ CAPTCHA completion timeout")
-            #         raise Exception("CAPTCHA completion timeout")
-            # else:
-            #     print("⚠️  CAPTCHA solver disabled - proceeding without CAPTCHA handling")
-            #     # Just wait a bit for page to load
-            #     time.sleep(3)
-            
-            # # Give additional time for page to stabilize after CAPTCHA
-            # time.sleep(2)
-            # print(f"Navigated to login page: {login_url}")
-            
             # Find phone number input (based on the images provided)
             # print("🔍 Looking for login form elements...")
             phone_input = WebDriverWait(self.driver, 10).until(
@@ -589,27 +564,6 @@ class BetEngine(WebsiteOpener):
             )
             login_button.click()
             auth_logger.info(f"🚀 Clicked login button")
-            
-            # Check for additional CAPTCHA after login attempt
-            # time.sleep(10)
-            # if captcha_solver:
-            #     print("🔍 Checking for post-login CAPTCHA...")
-            #     post_login_captcha_solved = captcha_solver.solve_turnstile_captcha(
-            #         driver=self.driver,
-            #         page_url=self.driver.current_url,
-            #         max_retries=captcha_config.get("max_retries", 3)
-            #     )
-                
-            #     if not post_login_captcha_solved:
-            #         print("❌ Failed to solve post-login CAPTCHA")
-            #         # Don't fail completely - sometimes login works despite CAPTCHA issues
-            #         print("⚠️  Continuing despite post-login CAPTCHA issues...")
-            # else:
-            #     print("⚠️  CAPTCHA solver disabled - skipping post-login CAPTCHA check")
-            
-            # Wait for login to complete (reduced from 1000 seconds!)
-            # print("⏳ Waiting for login completion...")
-            # time.sleep(5)
             
             # Take screenshot for debugging
             try:
@@ -663,6 +617,14 @@ class BetEngine(WebsiteOpener):
                 auth_logger.info(f"Login error screenshot saved to {screenshot_path}")
             except Exception as screenshot_error:
                 error_logger.error(f"Failed to take error screenshot: {screenshot_error}")
+            error_logger.error(f"❌ Login failed for account: {account.username}: {e}")
+            # Minimal recovery for Selenium tab crashes
+            msg = str(e).lower()
+            if ("tab crashed" in msg or "chrome not reachable" in msg or "disconnected" in msg) and not _retry:
+                error_logger.error("Detected browser/tab crash during login. Restarting browser and retrying once...")
+                self.__restart_browser(account)
+                return self.__do_login_for_account(account, _retry=True)
+            
             error_logger.error(f"❌ Login failed for account: {account.username}: {e}")
             raise
 
@@ -901,7 +863,31 @@ class BetEngine(WebsiteOpener):
             error_logger.error(f"Error generating MSport bet URL: {e}")
             return None
 
-    def __place_bet_with_selenium(self, account, bet_url, market_type, outcome, odds, stake, points=None, is_first_half=False):
+    def __wait_for_market_content(self, timeout_seconds: int = 15) -> None:
+        """
+        Explicitly wait for MSport market content to render.
+        Waits until at least one of the known market containers is present.
+        """
+        try:
+            # Ensure document is at least interactive/complete first
+            WebDriverWait(self.driver, timeout_seconds).until(
+                lambda d: d.execute_script("return document.readyState") in ("interactive", "complete")
+            )
+        except Exception:
+            # Continue to element-based checks even if readyState wait fails
+            pass
+        
+        target_selectors = [
+            ".m-market-item",
+            ".m-market-row.m-market-row--3",
+            ".m-market-row.m-market-row",
+        ]
+        
+        WebDriverWait(self.driver, timeout_seconds, poll_frequency=0.5).until(
+            lambda d: any(len(d.find_elements(By.CSS_SELECTOR, sel)) > 0 for sel in target_selectors)
+        )
+
+    def __place_bet_with_selenium(self, account, bet_url, market_type, outcome, odds, stake, points=None, is_first_half=False, _retry=False):
         """
         Place a bet on MSport using Selenium
         
@@ -928,7 +914,11 @@ class BetEngine(WebsiteOpener):
             
             bet_logger.info(f"Navigating to betting page: {bet_url}")
             self.open_url(bet_url)
-            # time.sleep(3)
+            # Wait for the market content to render instead of using sleep
+            try:
+                self.__wait_for_market_content(timeout_seconds=15)
+            except Exception as e:
+                bet_logger.warning(f"Market content not detected within wait window: {e}")
             
             # Find and click the market/outcome
             market_element = self.__get_market_selector(market_type, outcome, points, is_first_half)
@@ -940,25 +930,25 @@ class BetEngine(WebsiteOpener):
             try:
                 bet_logger.info(f"Found market element for: {market_type} - {outcome} - {points}")
                 
-                # Verify odds before placing bet
-                try:
-                    # Use more specific selector to find odds within the correct div structure
-                    odds_element = market_element.find_element(By.CSS_SELECTOR, ".has-desc.m-outcome.multiple .odds")
-                    odds_text = odds_element.text.strip()
-                    import re
-                    odds_match = re.search(r'(\d+\.?\d*)', odds_text)
-                    if odds_match:
-                        actual_odds = float(odds_match.group(1))
-                        odds_diff = abs(actual_odds - odds)
+                # # Verify odds before placing bet
+                # try:
+                #     # Use more specific selector to find odds within the correct div structure
+                #     odds_element = market_element.find_element(By.CSS_SELECTOR, ".has-desc.m-outcome.multiple .odds")
+                #     odds_text = odds_element.text.strip()
+                #     import re
+                #     odds_match = re.search(r'(\d+\.?\d*)', odds_text)
+                #     if odds_match:
+                #         actual_odds = float(odds_match.group(1))
+                #         odds_diff = abs(actual_odds - odds)
                         
-                        if odds_diff > 0.1:  # Allow 0.1 difference
-                            bet_logger.error(f"⚠️ Odds mismatch! Expected: {odds}, Actual: {actual_odds}")
-                            bet_logger.error("Bet cancelled due to odds change")
-                            return False
-                        else:
-                            bet_logger.info(f"✅ Odds verified: {actual_odds} (expected: {odds})")
-                except Exception as e:
-                    bet_logger.error(f"Could not verify odds: {e}")
+                #         if odds_diff > 0.1:  # Allow 0.1 difference
+                #             bet_logger.error(f"⚠️ Odds mismatch! Expected: {odds}, Actual: {actual_odds}")
+                #             bet_logger.error("Bet cancelled due to odds change")
+                #             return False
+                #         else:
+                #             bet_logger.info(f"✅ Odds verified: {actual_odds} (expected: {odds})")
+                # except Exception as e:
+                #     bet_logger.error(f"Could not verify odds: {e}")
                 
                 # Simple direct clicking approach - no scrolling
                 try:
@@ -1138,8 +1128,10 @@ class BetEngine(WebsiteOpener):
                     
                     # Try JavaScript click if regular click fails
                     try:
-                        place_bet_button.click()
-                        bet_logger.info("Clicked place bet button")
+                        self.driver.execute_script("arguments[0].click();", place_bet_button)
+                        bet_logger.info("JavaScript clicked place bet button")
+                        # place_bet_button.click()
+                        # bet_logger.info("Clicked place bet button")
                     except Exception as click_error:
                         bet_logger.error(f"Regular click failed, trying JavaScript click: {click_error}")
                         self.driver.execute_script("arguments[0].click();", place_bet_button)
@@ -1205,6 +1197,13 @@ class BetEngine(WebsiteOpener):
                 return False
                 
         except Exception as e:
+            # Minimal recovery for Selenium tab crashes
+            msg = str(e).lower()
+            if ("tab crashed" in msg or "chrome not reachable" in msg or "disconnected" in msg):
+                bet_logger.error("Detected browser/tab crash during bet placement. Restarting browser and retrying once...")
+                self.__restart_browser(account)
+                return self.__place_bet_with_selenium(account, bet_url, market_type, outcome, odds, stake, points, is_first_half, _retry=True)
+            
             bet_logger.error(f"Error placing bet with Selenium: {e}")
             # Take screenshot of error state
             try:
@@ -1679,7 +1678,7 @@ class BetEngine(WebsiteOpener):
         
         # If we couldn't get latest odds, fall back to the ones in shaped_data
         if not latest_prices:
-            print("Using odds from original alert as fallback")
+            bet_logger.debug("Using odds from original alert as fallback")
             # Get prices from shaped_data based on line type
             if line_type == "money_line":
                 # For moneyline, we use home, away, and draw prices
@@ -1709,14 +1708,14 @@ class BetEngine(WebsiteOpener):
         else:
             # Use the latest prices we fetched
             decimal_prices = latest_prices
-            print(f"Using latest Pinnacle odds: {decimal_prices}")
+            bet_logger.debug(f"Using latest Pinnacle odds: {decimal_prices}")
         
         # Store the prices for later use in stake calculation
         shaped_data["_decimal_prices"] = decimal_prices
         
         # Calculate no-vig prices
         if not decimal_prices:
-            print("No prices found for calculation")
+            bet_logger.debug("No prices found for calculation")
             return -100  # Negative EV as fallback
             
         no_vig_prices = calculate_no_vig_prices(decimal_prices)
@@ -1736,12 +1735,12 @@ class BetEngine(WebsiteOpener):
         true_price = no_vig_prices["power"].get(outcome_key)
         
         if not true_price:
-            print(f"No no-vig price found for outcome {outcome_key}")
+            bet_logger.debug(f"No no-vig price found for outcome {outcome_key}")
             return -100  # Negative EV as fallback
             
         # Calculate EV
         ev = calculate_ev(bet_odds, true_price)
-        print(f"Bet odds: {bet_odds}, True price: {true_price}, EV: {ev:.2f}%")
+        bet_logger.debug(f"Bet odds: {bet_odds}, True price: {true_price}, EV: {ev:.2f}%")
         
         return ev
         
@@ -1760,12 +1759,12 @@ class BetEngine(WebsiteOpener):
         - Dictionary with the latest decimal prices or None if not found
         """
         if not event_id:
-            print("No event ID provided, cannot fetch latest odds")
+            bet_logger.debug("No event ID provided, cannot fetch latest odds")
             return None
             
         pinnacle_api_host = os.getenv("PINNACLE_HOST")
         if not pinnacle_api_host:
-            print("Pinnacle Events API host not configured")
+            bet_logger.debug("Pinnacle Events API host not configured")
             return None
             
         # Get proxy from first account if available
@@ -1773,20 +1772,20 @@ class BetEngine(WebsiteOpener):
         if self.__accounts and hasattr(self.__accounts[0], 'get_proxies'):
             proxies = self.__accounts[0].get_proxies()
             if proxies:
-                print(f"Using proxy for Pinnacle odds: {self.__accounts[0].proxy}")
+                bet_logger.debug(f"Using proxy for Pinnacle odds: {self.__accounts[0].proxy}")
             
         try:
             url = f"{pinnacle_api_host}/events/{event_id}"
-            print(f"Fetching latest odds from: {url}")
+            bet_logger.debug(f"Fetching latest odds from: {url}")
             
             response = requests.get(url)
             if response.status_code != 200:
-                print(f"Failed to fetch latest odds: HTTP {response.status_code}")
+                bet_logger.debug(f"Failed to fetch latest odds: HTTP {response.status_code}")
                 return None
                 
             event_data = response.json()
             if not event_data or "data" not in event_data or not event_data["data"]:
-                print("No data returned from Pinnacle API")
+                bet_logger.debug("No data returned from Pinnacle API")
                 return None
                 
             if event_data["data"] == None or event_data["data"] == "null":
@@ -1857,7 +1856,7 @@ class BetEngine(WebsiteOpener):
             return decimal_prices if decimal_prices else None
             
         except Exception as e:
-            print(f"Error fetching latest odds: {e}")
+            bet_logger.error(f"Error fetching latest odds: {e}")
             return None
 
     def __power_method_devig(self, odds_list, max_iter=100, tol=1e-10):
@@ -1964,11 +1963,11 @@ class BetEngine(WebsiteOpener):
             if min_odds <= odds <= max_odds:
                 min_stake = range_config.get("min_stake", self.__min_stake)
                 max_stake = range_config.get("max_stake", self.__max_stake)
-                print(f"Using {range_name} stake limits for odds {odds:.2f}: min={min_stake}, max={max_stake}")
+                bet_logger.debug(f"Using {range_name} stake limits for odds {odds:.2f}: min={min_stake}, max={max_stake}")
                 return min_stake, max_stake
         
         # If no range matches, use default limits
-        print(f"Using default stake limits for odds {odds:.2f}: min={self.__min_stake}, max={self.__max_stake}")
+        bet_logger.debug(f"Using default stake limits for odds {odds:.2f}: min={self.__min_stake}, max={self.__max_stake}")
         return self.__min_stake, self.__max_stake
 
     def __calculate_stake(self, bet_odds, shaped_data, bankroll):
@@ -1987,7 +1986,7 @@ class BetEngine(WebsiteOpener):
         outcome_key = shaped_data.get("_outcome_key", "")
         
         if not decimal_prices or not outcome_key:
-            print("Missing required data for stake calculation")
+            bet_logger.debug("Missing required data for stake calculation")
             return self.__round_stake_humanlike(10)  # Default stake if calculation not possible
         
         # Extract values into a list for power method
@@ -2006,7 +2005,7 @@ class BetEngine(WebsiteOpener):
         
         # Get the probability for our specific outcome
         if outcome_key not in outcome_probs:
-            print(f"Outcome {outcome_key} not found in probabilities")
+            bet_logger.debug(f"Outcome {outcome_key} not found in probabilities")
             return self.__round_stake_humanlike(10)  # Default stake
             
         outcome_prob = outcome_probs[outcome_key]
@@ -2026,7 +2025,7 @@ class BetEngine(WebsiteOpener):
         # Round to human-like amounts
         rounded_stake = self.__round_stake_humanlike(stake)
         
-        print(f"Probability: {outcome_prob:.4f}, Full Kelly: {full_kelly:.2f}, "
+        bet_logger.debug(f"Probability: {outcome_prob:.4f}, Full Kelly: {full_kelly:.2f}, "
               f"Fractional Kelly (30%): {fractional_kelly:.2f}, Calculated Stake: {stake:.2f}, "
               f"Rounded Stake: {rounded_stake:.2f}")
         
@@ -2040,12 +2039,12 @@ class BetEngine(WebsiteOpener):
         - shaped_data: The data from Pinnacle shaped according to BetEngine requirements
         """
         try:
-            print(f"Processing alert: {shaped_data}")
+            bet_logger.debug(f"Processing alert: {shaped_data}")
             
             # Validate shaped data
             required_fields = ['game', 'category', 'match_type']
             if not all(field in shaped_data for field in required_fields):
-                print("Invalid shaped data format")
+                bet_logger.debug("Invalid shaped data format")
                 return
                 
             # Get necessary information from shaped data
@@ -2061,7 +2060,7 @@ class BetEngine(WebsiteOpener):
             # Get start time if available
             pinnacle_start_time = shaped_data.get("starts")
             if pinnacle_start_time:
-                print(f"Alert contains start time: {pinnacle_start_time}")
+                bet_logger.debug(f"Alert contains start time: {pinnacle_start_time}")
             
             # Determine if this is for first half or full match
             is_first_half = False
@@ -2069,21 +2068,21 @@ class BetEngine(WebsiteOpener):
                 is_first_half = True
                 
             # Step 1: Search for the event on MSport
-            print(f"Searching for event: {home_team} vs {away_team}")
+            bet_logger.debug(f"Searching for event: {home_team} vs {away_team}")
             event_id = self.__search_event(home_team, away_team, pinnacle_start_time)
             if not event_id:
-                print("Event not found, cannot place bet")
+                bet_logger.debug("Event not found, cannot place bet")
                 return
                 
             # Step 2: Get event details
-            print(f"Getting event details for event: {event_id}")
+            bet_logger.debug(f"Getting event details for event: {event_id}")
             event_details = self.__get_event_details(event_id)
             if not event_details:
-                print("Could not get event details, cannot place bet")
+                bet_logger.debug("Could not get event details, cannot place bet")
                 return
                 
             # Step 3: Find the market for the bet
-            print(f"Finding market for bet: {line_type} {outcome} {original_points}")
+            bet_logger.debug(f"Finding market for bet: {line_type} {outcome} {original_points}")
             bet_code, bet_odds, adjusted_points = self.__find_market_bet_code_with_points(
                 event_details, 
                 line_type, 
@@ -2096,16 +2095,16 @@ class BetEngine(WebsiteOpener):
             )
             
             if not bet_code or not bet_odds:
-                print("Could not find appropriate market, cannot place bet")
+                bet_logger.debug("Could not find appropriate market, cannot place bet")
                 return
                 
             # Create a modified shaped_data with the adjusted points
             modified_shaped_data = shaped_data.copy()
             modified_shaped_data["category"]["meta"]["value"] = adjusted_points
-            print(f"Using adjusted points: {adjusted_points} (original was: {original_points})")
+            bet_logger.debug(f"Using adjusted points: {adjusted_points} (original was: {original_points})")
             
             # Step 4: Calculate EV with the adjusted points
-            print(f"Calculating EV with adjusted points: {adjusted_points}")
+            bet_logger.debug(f"Calculating EV with adjusted points: {adjusted_points}")
             ev = self.__calculate_ev(bet_odds, modified_shaped_data)
             
             # Log the current bet placement mode
@@ -2121,15 +2120,15 @@ class BetEngine(WebsiteOpener):
             decimal_prices = modified_shaped_data.get("_decimal_prices", {})
             outcome_key = modified_shaped_data.get("_outcome_key", "")
             if bet_odds > self.__max_pinnacle_odds:
-                print(f"Pinnacle odds ({bet_odds:.2f}) are above {self.__max_pinnacle_odds} threshold, not placing bet")
+                bet_logger.debug(f"Pinnacle odds ({bet_odds:.2f}) are above {self.__max_pinnacle_odds} threshold, not placing bet")
                 return False
             else: 
-                print(f"Pinnacle odds check passed: {bet_odds:.2f} <= {self.__max_pinnacle_odds}")
+                bet_logger.debug(f"Pinnacle odds check passed: {bet_odds:.2f} <= {self.__max_pinnacle_odds}")
             
             # Step 5: Place bet if EV is positive and above threshold
-            print(f"EV: {ev:.2f}%")
+            bet_logger.debug(f"EV: {ev:.2f}%")
             if ev > self.__min_ev:
-                print(f"Positive EV ({ev:.2f}%), placing bet")
+                bet_logger.debug(f"Positive EV ({ev:.2f}%), placing bet")
                 
                 # Queue the bet for placement
                 success = self.__place_bet(
@@ -2141,15 +2140,15 @@ class BetEngine(WebsiteOpener):
                 )
                 
                 if success:
-                    print(f"Successfully queued bet on {home_team} vs {away_team} - {line_type} {outcome} {adjusted_points}")
+                    bet_logger.debug(f"Successfully queued bet on {home_team} vs {away_team} - {line_type} {outcome} {adjusted_points}")
                 else:
-                    print("Failed to queue bet")
+                    bet_logger.debug("Failed to queue bet")
             else:
-                print(f"Negative or insufficient EV ({ev:.2f}%), not placing bet")
+                bet_logger.debug(f"Negative or insufficient EV ({ev:.2f}%), not placing bet")
                 
             return ev > self.__min_ev
         except Exception as e:
-            print(f"Error in notify method: {e}")
+            bet_logger.error(f"Error in notify method: {e}")
             # Close browser on error
             self.cleanup()
             raise
@@ -2169,18 +2168,18 @@ class BetEngine(WebsiteOpener):
         Returns:
         - Tuple of (bet_code, odds, adjusted_points)
         """
-        print(f"sport id {sport_id}")
-        print(f"Finding market for Game: {home_team} vs {away_team}: {line_type} - {outcome} - {points} - First Half: {is_first_half} - Sport: {'Basketball' if sport_id == 3 or sport_id == "3" else 'Soccer'}")
+        bet_logger.debug(f"sport id {sport_id}")
+        bet_logger.debug(f"Finding market for Game: {home_team} vs {away_team}: {line_type} - {outcome} - {points} - First Half: {is_first_half} - Sport: {'Basketball' if sport_id == 3 or sport_id == "3" else 'Soccer'}")
         
         if "markets" not in event_details:
-            print("No markets found in event details")
+            bet_logger.debug("No markets found in event details")
             return None, None, None
 
         markets = event_details["markets"]
         
         # Use different market names based on sport
         is_basketball = (sport_id == "3" or sport_id == 3)
-        print(f"is basketball: {is_basketball}")
+        bet_logger.debug(f"is basketball: {is_basketball}")
         
         # Determine the correct market descriptions based on is_first_half
         if is_first_half:
@@ -2209,7 +2208,7 @@ class BetEngine(WebsiteOpener):
                     # Map outcome to MSport format
                     outcome_map = {"home": "1", "away": "3", "draw": "2"}
                     if outcome.lower() not in outcome_map:
-                        print(f"Invalid outcome for moneyline: {outcome}")
+                        bet_logger.debug(f"Invalid outcome for moneyline: {outcome}")
                         continue
                         
                     target_outcome_id = outcome_map[outcome.lower()]
@@ -2217,10 +2216,10 @@ class BetEngine(WebsiteOpener):
                     # Find matching outcome
                     for market_outcome in market.get("outcomes", []):
                         if market_outcome.get("id") == target_outcome_id:
-                            print(f"Found moneyline market: {market['description']} outcome {target_outcome_id} with odds {market_outcome['odds']}")
+                            bet_logger.debug(f"Found moneyline market: {market['description']} outcome {target_outcome_id} with odds {market_outcome['odds']}")
                             return market_outcome["id"], float(market_outcome["odds"]), None
             
-            print(f"No matching moneyline market found for {outcome}")
+            bet_logger.debug(f"No matching moneyline market found for {outcome}")
             return None, None, None
             
         # Handle TOTAL bets (Over/Under in MSport)
@@ -2228,7 +2227,7 @@ class BetEngine(WebsiteOpener):
             # Map outcome to MSport format
             outcome_map = {"over": "12", "under": "13"}
             if outcome.lower() not in outcome_map:
-                print(f"Invalid outcome for total: {outcome}")
+                bet_logger.debug(f"Invalid outcome for total: {outcome}")
                 return None, None, None
                 
             target_outcome_id = outcome_map[outcome.lower()]
@@ -2236,7 +2235,7 @@ class BetEngine(WebsiteOpener):
             
             # Round to nearest 0.5 increment first (e.g., 1.25 -> 1.5, 1.3 -> 1.5, 1.7 -> 1.5)
             rounded_points = round(original_points * 2) / 2
-            print(f"Original points: {original_points}, Rounded to nearest 0.5: {rounded_points}")
+            bet_logger.debug(f"Original points: {original_points}, Rounded to nearest 0.5: {rounded_points}")
             
             # Generate alternate lines to search for (4 steps up and down with 0.5 increments)
             alternate_points = []
@@ -2254,7 +2253,7 @@ class BetEngine(WebsiteOpener):
                 if lower_point >= 0:  # Don't go below 0
                     alternate_points.append(lower_point)
             
-            print(f"Searching for total points in order: {alternate_points}")
+            bet_logger.debug(f"Searching for total points in order: {alternate_points}")
             
             # Find Over/Under markets and look for the closest points from our alternate list
             best_match = None
@@ -2302,11 +2301,11 @@ class BetEngine(WebsiteOpener):
             
             if best_match:
                 if best_match["points"] != original_points:
-                    print(f"Exact total {original_points} not found, using closest: {best_match['points']}")
-                print(f"Found total market: {best_match['description']} with odds {best_match['odds']}")
+                    bet_logger.debug(f"Exact total {original_points} not found, using closest: {best_match['points']}")
+                bet_logger.debug(f"Found total market: {best_match['description']} with odds {best_match['odds']}")
                 return best_match["id"], best_match["odds"], best_match["points"]
             
-            print(f"No matching total market found for {points} {outcome} or alternate lines")
+            bet_logger.debug(f"No matching total market found for {points} {outcome} or alternate lines")
             return None, None, None
             
         # Handle SPREAD bets (Asian Handicap in MSport)
@@ -2315,12 +2314,12 @@ class BetEngine(WebsiteOpener):
             
             # Check if handicap is 0 - if so, use DNB (Draw No Bet) market instead
             if abs(original_points) < 0.01:  # Using small threshold for floating point comparison
-                print(f"Handicap is 0, looking for DNB (Draw No Bet) market instead of Asian Handicap")
+                bet_logger.debug(f"Handicap is 0, looking for DNB (Draw No Bet) market instead of Asian Handicap")
                 
                 # Map outcome to MSport format for DNB (based on actual API structure)
                 outcome_map = {"home": "4", "away": "5"}
                 if outcome.lower() not in outcome_map:
-                    print(f"Invalid outcome for DNB: {outcome}")
+                    bet_logger.debug(f"Invalid outcome for DNB: {outcome}")
                     return None, None, None
                     
                 target_outcome_id = outcome_map[outcome.lower()]
@@ -2336,24 +2335,24 @@ class BetEngine(WebsiteOpener):
                         # Find matching outcome
                         for market_outcome in market.get("outcomes", []):
                             if market_outcome.get("id") == target_outcome_id:
-                                print(f"Found DNB market: {market['description']} outcome {target_outcome_id} with odds {market_outcome['odds']}")
+                                bet_logger.debug(f"Found DNB market: {market['description']} outcome {target_outcome_id} with odds {market_outcome['odds']}")
                                 return market_outcome["id"], float(market_outcome["odds"]), 0.0  # Return 0.0 as adjusted points
                 
-                print(f"No matching DNB market found for {outcome}")
+                bet_logger.debug(f"No matching DNB market found for {outcome}")
                 return None, None, None
             
             # Original Asian Handicap logic for non-zero handicaps
             # Map outcome to MSport format for Asian Handicap
             outcome_map = {"home": "1714", "away": "1715"}
             if outcome.lower() not in outcome_map:
-                print(f"Invalid outcome for handicap: {outcome}")
+                bet_logger.debug(f"Invalid outcome for handicap: {outcome}")
                 return None, None, None
                 
             target_outcome_id = outcome_map[outcome.lower()]
             
             # Round to nearest 0.5 increment first (e.g., -0.25 -> -0.5, +1.3 -> +1.5, -1.7 -> -1.5)
             rounded_points = round(original_points * 2) / 2
-            print(f"Original handicap: {original_points}, Rounded to nearest 0.5: {rounded_points}")
+            bet_logger.debug(f"Original handicap: {original_points}, Rounded to nearest 0.5: {rounded_points}")
             
             # Generate alternate handicap lines to search for (4 steps in each direction with 0.5 increments)
             alternate_points = []
@@ -2385,7 +2384,7 @@ class BetEngine(WebsiteOpener):
                     if new_point >= 0:  # Don't cross zero for positive handicaps
                         alternate_points.append(new_point)
             
-            print(f"Searching for handicap points in order: {alternate_points}")
+            bet_logger.debug(f"Searching for handicap points in order: {alternate_points}")
             
             # Find Asian Handicap markets and look for the closest points from our alternate list
             best_match = None
@@ -2432,15 +2431,15 @@ class BetEngine(WebsiteOpener):
             
             if best_match:
                 if best_match["points"] != original_points:
-                    print(f"Exact handicap {original_points} not found, using closest: {best_match['points']}")
-                print(f"Found handicap market: {best_match['description']} with odds {best_match['odds']}")
+                    bet_logger.debug(f"Exact handicap {original_points} not found, using closest: {best_match['points']}")
+                bet_logger.debug(f"Found handicap market: {best_match['description']} with odds {best_match['odds']}")
                 return best_match["id"], best_match["odds"], best_match["points"]
             
-            print(f"No matching handicap market found for {points} {outcome} or alternate lines")
+            bet_logger.debug(f"No matching handicap market found for {points} {outcome} or alternate lines")
             return None, None, None
         
         else:
-            print(f"Unsupported line type: {line_type}")
+            bet_logger.debug(f"Unsupported line type: {line_type}")
             return None, None, None
             
     def __extract_points_from_key(self, key):
@@ -2462,12 +2461,12 @@ class BetEngine(WebsiteOpener):
         """Close browser and clean up resources"""
         if self.__browser_open and self.__browser_initialized:
             try:
-                print("Closing browser...")
+                bet_logger.debug("Closing browser...")
                 self.close_browser()
                 self.__browser_open = False
-                print("Browser closed successfully")
+                bet_logger.debug("Browser closed successfully")
             except Exception as e:
-                print(f"Error closing browser: {e}")
+                bet_logger.error(f"Error closing browser: {e}")
         
         # Reset browser state so it can be reinitialized when needed
         self.__browser_initialized = False
@@ -2580,14 +2579,14 @@ class BetEngine(WebsiteOpener):
                         "new_balance": new_balance,
                         "change": new_balance - old_balance
                     }
-                    print(f"Balance updated for {account.username}: {old_balance:.2f} -> {new_balance:.2f} (change: {new_balance - old_balance:+.2f})")
+                    bet_logger.debug(f"Balance updated for {account.username}: {old_balance:.2f} -> {new_balance:.2f} (change: {new_balance - old_balance:+.2f})")
                 except Exception as e:
-                    print(f"Failed to refresh balance for {account.username}: {e}")
+                    bet_logger.error(f"Failed to refresh balance for {account.username}: {e}")
                     balance_updates[account.username] = {
                         "error": str(e)
                     }
             else:
-                print(f"No valid cookies for {account.username}, skipping balance refresh")
+                bet_logger.debug(f"No valid cookies for {account.username}, skipping balance refresh")
                 
         return balance_updates
 
@@ -2655,7 +2654,7 @@ class BetEngine(WebsiteOpener):
         
         NEW: Now supports DNB (Draw No Bet) market when handicap is 0
         """
-        print("=== Testing Direct Bet Placement ===")
+        bet_logger.debug("=== Testing Direct Bet Placement ===")
         
         # Example test data - modify these values as needed
         test_data = {
@@ -2675,11 +2674,11 @@ class BetEngine(WebsiteOpener):
             "starts": None  # can add start time in milliseconds if needed
         }
         
-        print(f"Testing DNB market with handicap 0: {test_data['category']['meta']['value']}")
+        bet_logger.debug(f"Testing DNB market with handicap 0: {test_data['category']['meta']['value']}")
         
         try:
             # Step 1: Search for the event
-            print(f"\n1. Searching for event: {test_data['game']['home']} vs {test_data['game']['away']}")
+            bet_logger.debug(f"\n1. Searching for event: {test_data['game']['home']} vs {test_data['game']['away']}")
             event_id = self.search_event(
                 test_data["game"]["home"], 
                 test_data["game"]["away"], 
@@ -2687,13 +2686,13 @@ class BetEngine(WebsiteOpener):
             )
             
             if not event_id:
-                print("❌ Event not found")
+                bet_logger.debug("❌ Event not found")
                 return False
             
-            print(f"✅ Found event ID: {event_id}")
+            bet_logger.debug(f"✅ Found event ID: {event_id}")
             
             # Step 2: Get event details
-            print(f"\n2. Getting event details...")
+            bet_logger.debug(f"\n2. Getting event details...")
             event_details = self.get_event_details(event_id)
             
             if not event_details:

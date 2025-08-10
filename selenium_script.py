@@ -61,6 +61,21 @@ class WebsiteOpener:
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--disable-gpu')
         options.add_argument('--window-size=1920,1080')
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--disable-extensions")
+        options.add_argument("--disable-plugins")
+        options.add_argument("--disable-images")
+        options.add_argument("--disable-javascript")  # Only if not needed
+        options.add_argument("--memory-pressure-off")
+        options.add_argument("--max_old_space_size=4096")
+        
+        # Add user agent
+        options.add_argument("--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36")
+        
+        # Set page load strategy
+        options.page_load_strategy = 'eager'
         
         # Set up Selenium Wire options for proxy authentication
         seleniumwire_options = {}
