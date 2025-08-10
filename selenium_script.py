@@ -54,7 +54,7 @@ class WebsiteOpener:
         # Set up Chrome options
         options = Options()
         # if headless:
-        options.add_argument("--headless=new")
+        # options.add_argument("--headless=new")
         
         # Additional options for better compatibility
         options.add_argument('--no-sandbox')
@@ -146,7 +146,7 @@ class WebsiteOpener:
 def main():
     """Main function to demonstrate usage with proxy from config.json."""
     # Example URL to test proxy
-    url = "https://httpbin.io/ip"
+    url = "https://www.nairabet.com"
     
     # Create an instance of WebsiteOpener (will automatically use proxy from config.json)
     opener = WebsiteOpener(headless=False)

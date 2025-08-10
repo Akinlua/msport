@@ -2039,6 +2039,7 @@ class BetEngine(WebsiteOpener):
         - shaped_data: The data from Pinnacle shaped according to BetEngine requirements
         """
         try:
+            print(f"Processing alert: {shaped_data}")
             bet_logger.debug(f"Processing alert: {shaped_data}")
             
             # Validate shaped data
