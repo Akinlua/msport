@@ -297,3 +297,5 @@
 2025-08-10 08:31:33,491 - odds_engine - DEBUG - Bet was not successfully processed, still adding to processed collections
 2025-08-10 08:32:33,502 - odds_engine - DEBUG - Getting odds at 2025-08-10 08:32:33
 2025-08-10 08:32:33,504 - odds_engine - DEBUG - Looking back 1754811033504 milliseconds
+2025-08-10 08:35:40,807 - odds_engine - ERROR - Error fetching odds: HTTPSConnectionPool(host='swordfish-production.up.railway.app', port=443): Read timed out. (read timeout=None)
+2025-08-10 08:35:50,336 - odds_engine - INFO - Stopping odds monitoring...

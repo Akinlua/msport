@@ -2113,7 +2113,7 @@ class BetEngine(WebsiteOpener):
             
             # Check if EV meets minimum threshold
             if ev < self.__min_ev:
-                bet_logger.info(f"EV {ev:.2%} below minimum threshold {self.__min_ev:.2%}, skipping bet")
+                bet_logger.info(f"EV {ev} below minimum threshold {self.__min_ev}, skipping bet")
                 return False
             
             # Check Pinnacle odds for the specific outcome before placing bet
