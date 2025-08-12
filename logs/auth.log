@@ -86,3 +86,29 @@
 2025-08-13 00:32:10,581 - auth - INFO - Account 8168309913 balance: 186.35 (avlBal: 1863500, bizCode: 10000)
 2025-08-13 00:32:10,582 - auth - INFO - Updated account balance: 186.35
 2025-08-13 00:32:10,582 - auth - INFO - Updated account balance: 186.35
+2025-08-13 00:44:18,977 - auth - INFO - Added account: 8168309913
+2025-08-13 00:44:18,977 - auth - INFO - Added account: 8168309913
+2025-08-13 00:44:18,978 - auth - INFO - Attempting initial login for all accounts...
+2025-08-13 00:44:18,978 - auth - INFO - Attempting initial login for all accounts...
+2025-08-13 00:44:18,978 - auth - INFO - Logging in to MSport with account: 8168309913
+2025-08-13 00:44:18,978 - auth - INFO - Logging in to MSport with account: 8168309913
+2025-08-13 00:44:22,047 - auth - INFO - ✅ Using proxy - Current IP address: 45.201.113.244 8168309913 http://brd-customer-hl_3fa1037b-zone-datacenter_proxy1-country-ng:be0682squyj3@brd.superproxy.io:33335
+2025-08-13 00:44:22,047 - auth - INFO - ✅ Using proxy - Current IP address: 45.201.113.244 8168309913 http://brd-customer-hl_3fa1037b-zone-datacenter_proxy1-country-ng:be0682squyj3@brd.superproxy.io:33335
+2025-08-13 00:44:27,140 - auth - INFO - Not logged in, proceeding with login process for account: 8168309913
+2025-08-13 00:44:27,140 - auth - INFO - Not logged in, proceeding with login process for account: 8168309913
+2025-08-13 00:44:40,659 - auth - INFO - Navigated to login page: https://www.msport.com
+2025-08-13 00:44:40,659 - auth - INFO - Navigated to login page: https://www.msport.com
+2025-08-13 00:44:40,780 - auth - INFO - 📱 Entered phone number: 8168309913
+2025-08-13 00:44:40,780 - auth - INFO - 📱 Entered phone number: 8168309913
+2025-08-13 00:44:40,881 - auth - INFO - 🔑 Entered password
+2025-08-13 00:44:40,881 - auth - INFO - 🔑 Entered password
+2025-08-13 00:44:41,002 - auth - INFO - 🚀 Clicked login button
+2025-08-13 00:44:41,002 - auth - INFO - 🚀 Clicked login button
+2025-08-13 00:44:43,900 - auth - INFO - Login successful for account: 8168309913
+2025-08-13 00:44:43,900 - auth - INFO - Login successful for account: 8168309913
+2025-08-13 00:44:46,126 - auth - INFO - Account 8168309913 balance: 186.35 (avlBal: 1863500, bizCode: 10000)
+2025-08-13 00:44:46,126 - auth - INFO - Account 8168309913 balance: 186.35 (avlBal: 1863500, bizCode: 10000)
+2025-08-13 00:44:46,127 - auth - INFO - Updated account balance: 186.35
+2025-08-13 00:44:46,127 - auth - INFO - Updated account balance: 186.35
+2025-08-13 00:44:46,127 - auth - INFO - Successfully logged in account: 8168309913
+2025-08-13 00:44:46,127 - auth - INFO - Successfully logged in account: 8168309913

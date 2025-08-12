@@ -4,3 +4,12 @@
 2025-08-13 00:32:10,583 - odds_engine - DEBUG - Looking back 1755041410583 milliseconds
 2025-08-13 00:32:11,436 - odds_engine - DEBUG - No new alerts
 2025-08-13 00:32:53,878 - odds_engine - INFO - Stopping odds monitoring...
+2025-08-13 00:44:46,234 - odds_engine - INFO - Starting odds monitoring with interval of 60 seconds
+2025-08-13 00:44:46,234 - odds_engine - INFO - Started odds monitoring thread with interval of 60 seconds
+2025-08-13 00:44:46,234 - odds_engine - DEBUG - Getting odds at 2025-08-13 00:44:46
+2025-08-13 00:44:46,234 - odds_engine - DEBUG - Looking back 1755042166234 milliseconds
+2025-08-13 00:44:47,007 - odds_engine - DEBUG - No new alerts
+2025-08-13 00:45:47,018 - odds_engine - DEBUG - Getting odds at 2025-08-13 00:45:47
+2025-08-13 00:45:47,019 - odds_engine - DEBUG - Looking back 1755042227019 milliseconds
+2025-08-13 00:45:47,739 - odds_engine - DEBUG - No new alerts
+2025-08-13 00:45:50,730 - odds_engine - INFO - Stopping odds monitoring...
