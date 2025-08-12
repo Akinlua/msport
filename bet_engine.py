@@ -164,9 +164,9 @@ class BetEngine(WebsiteOpener):
         # bet_logger.info(f"Initializing BetEngine with min_ev: {min_ev}")
         # Only initialize browser if needed for certain operations
         
-        # self.__headless = headless
-        # self.__skip_initial_login = skip_initial_login
-      
+        # Store initialization parameters
+        self.__headless = headless
+        self.__skip_initial_login = skip_initial_login
         
         # Set up logging
         self.bet_logger, self.odds_logger, self.auth_logger, self.error_logger = setup_logging()
@@ -196,10 +196,19 @@ class BetEngine(WebsiteOpener):
         # Track processed games to avoid reprocessing
         self.__processed_games = set()
         
+        # Initialize bet queue for queued bet placement
+        self.__bet_queue = queue.Queue()
+        
+        # Initialize cookie jar for search functionality
+        self.__cookie_jar = None
+        
         # Initialize browser if not skipping initial login
         if not skip_initial_login:
             self.__do_login()
         
+        # Start bet worker thread for queued bet placement
+        self.__start_bet_worker()
+    
     def _initialize_browser_if_needed(self, account=None):
         """Initialize the browser if it hasn't been initialized yet
         
@@ -434,7 +443,7 @@ class BetEngine(WebsiteOpener):
                 self.__bet_queue.task_done()
                 
             except Exception as e:
-                error_logger.error(f"Error in bet worker thread: {e}")
+                self.error_logger.error(f"Error in bet worker thread: {e}")
                 
             # Small sleep to prevent CPU hogging
             time.sleep(0.1)
