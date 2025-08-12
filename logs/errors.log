@@ -1,24 +1,6 @@
-2025-08-13 00:19:06,161 - errors - ERROR - ❌ Login failed for account: 8168309913: 'BetEngine' object has no attribute '_BetEngine__browser_initialized'
-2025-08-13 00:19:06,161 - errors - ERROR - ❌ Login failed for account: 8168309913: 'BetEngine' object has no attribute '_BetEngine__browser_initialized'
-2025-08-13 00:19:06,161 - errors - ERROR - ❌ Login failed for account: 8168309913: 'BetEngine' object has no attribute '_BetEngine__browser_initialized'
-2025-08-13 00:19:06,161 - errors - ERROR - ❌ Login failed for account: 8168309913: 'BetEngine' object has no attribute '_BetEngine__browser_initialized'
-2025-08-13 00:19:06,161 - errors - ERROR - Failed to login account 8168309913 during setup: 'BetEngine' object has no attribute '_BetEngine__browser_initialized'
-2025-08-13 00:19:06,161 - errors - ERROR - Failed to login account 8168309913 during setup: 'BetEngine' object has no attribute '_BetEngine__browser_initialized'
-2025-08-13 00:24:59,271 - errors - ERROR - ❌ Login failed for account: 8168309913: 'BetEngine' object has no attribute '_BetEngine__browser_initialized'
-2025-08-13 00:24:59,271 - errors - ERROR - ❌ Login failed for account: 8168309913: 'BetEngine' object has no attribute '_BetEngine__browser_initialized'
-2025-08-13 00:24:59,271 - errors - ERROR - ❌ Login failed for account: 8168309913: 'BetEngine' object has no attribute '_BetEngine__browser_initialized'
-2025-08-13 00:24:59,271 - errors - ERROR - ❌ Login failed for account: 8168309913: 'BetEngine' object has no attribute '_BetEngine__browser_initialized'
-2025-08-13 00:24:59,271 - errors - ERROR - Failed to login account 8168309913 during setup: 'BetEngine' object has no attribute '_BetEngine__browser_initialized'
-2025-08-13 00:24:59,271 - errors - ERROR - Failed to login account 8168309913 during setup: 'BetEngine' object has no attribute '_BetEngine__browser_initialized'
-2025-08-13 00:29:45,054 - errors - ERROR - ❌ Login failed for account: 8168309913: 'BetEngine' object has no attribute '_BetEngine__browser_initialized'
-2025-08-13 00:29:45,054 - errors - ERROR - ❌ Login failed for account: 8168309913: 'BetEngine' object has no attribute '_BetEngine__browser_initialized'
-2025-08-13 00:29:45,054 - errors - ERROR - ❌ Login failed for account: 8168309913: 'BetEngine' object has no attribute '_BetEngine__browser_initialized'
-2025-08-13 00:29:45,054 - errors - ERROR - ❌ Login failed for account: 8168309913: 'BetEngine' object has no attribute '_BetEngine__browser_initialized'
-2025-08-13 00:29:45,054 - errors - ERROR - Failed to login account 8168309913 during setup: 'BetEngine' object has no attribute '_BetEngine__browser_initialized'
-2025-08-13 00:29:45,054 - errors - ERROR - Failed to login account 8168309913 during setup: 'BetEngine' object has no attribute '_BetEngine__browser_initialized'
-2025-08-13 00:30:11,553 - errors - ERROR - ❌ Login failed for account: 8168309913: 'BetEngine' object has no attribute '_BetEngine__browser_initialized'
-2025-08-13 00:30:11,553 - errors - ERROR - ❌ Login failed for account: 8168309913: 'BetEngine' object has no attribute '_BetEngine__browser_initialized'
-2025-08-13 00:30:11,553 - errors - ERROR - ❌ Login failed for account: 8168309913: 'BetEngine' object has no attribute '_BetEngine__browser_initialized'
-2025-08-13 00:30:11,553 - errors - ERROR - ❌ Login failed for account: 8168309913: 'BetEngine' object has no attribute '_BetEngine__browser_initialized'
-2025-08-13 00:30:11,553 - errors - ERROR - Failed to login account 8168309913 during setup: 'BetEngine' object has no attribute '_BetEngine__browser_initialized'
-2025-08-13 00:30:11,553 - errors - ERROR - Failed to login account 8168309913 during setup: 'BetEngine' object has no attribute '_BetEngine__browser_initialized'
+2025-08-12 23:48:37,601 - errors - ERROR - ❌ Login failed for account: 8168309913: Login verification timeout
+2025-08-12 23:48:37,601 - errors - ERROR - ❌ Login failed for account: 8168309913: Login verification timeout
+2025-08-12 23:48:37,601 - errors - ERROR - ❌ Login failed for account: 8168309913: Login verification timeout
+2025-08-12 23:48:37,601 - errors - ERROR - ❌ Login failed for account: 8168309913: Login verification timeout
+2025-08-12 23:48:37,601 - errors - ERROR - Failed to login account 8168309913 during setup: Login verification timeout
+2025-08-12 23:48:37,601 - errors - ERROR - Failed to login account 8168309913 during setup: Login verification timeout

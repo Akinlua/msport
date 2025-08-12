@@ -1,76 +1,22 @@
-2025-08-12 23:45:47,551 - betting - INFO - Loaded configuration from config.json
-2025-08-12 23:45:47,551 - betting - INFO - Loaded configuration from config.json
-2025-08-12 23:45:47,551 - betting - INFO - Set up 1 betting accounts
-2025-08-12 23:45:47,551 - betting - INFO - Set up 1 betting accounts
-2025-08-13 00:19:05,975 - betting - INFO - Loaded configuration from config.json
-2025-08-13 00:19:05,975 - betting - INFO - Loaded configuration from config.json
-2025-08-13 00:19:05,978 - betting - INFO - Set up 1 betting accounts
-2025-08-13 00:19:05,978 - betting - INFO - Set up 1 betting accounts
-2025-08-13 00:24:59,059 - betting - INFO - Loaded configuration from config.json
-2025-08-13 00:24:59,059 - betting - INFO - Loaded configuration from config.json
-2025-08-13 00:24:59,061 - betting - INFO - Set up 1 betting accounts
-2025-08-13 00:24:59,061 - betting - INFO - Set up 1 betting accounts
-2025-08-13 00:29:44,895 - betting - INFO - Loaded configuration from config.json
-2025-08-13 00:29:44,895 - betting - INFO - Loaded configuration from config.json
-2025-08-13 00:29:44,897 - betting - INFO - Set up 1 betting accounts
-2025-08-13 00:29:44,897 - betting - INFO - Set up 1 betting accounts
-2025-08-13 00:30:11,384 - betting - INFO - Loaded configuration from config.json
-2025-08-13 00:30:11,384 - betting - INFO - Loaded configuration from config.json
-2025-08-13 00:30:11,385 - betting - INFO - Set up 1 betting accounts
-2025-08-13 00:30:11,385 - betting - INFO - Set up 1 betting accounts
-2025-08-13 00:31:13,127 - betting - INFO - Loaded configuration from config.json
-2025-08-13 00:31:13,127 - betting - INFO - Loaded configuration from config.json
-2025-08-13 00:31:13,128 - betting - INFO - Set up 1 betting accounts
-2025-08-13 00:31:13,128 - betting - INFO - Set up 1 betting accounts
-2025-08-13 00:31:13,128 - betting - DEBUG - self.__browser_initialized: False
-2025-08-13 00:31:13,128 - betting - DEBUG - self.__browser_initialized: False
-2025-08-13 00:31:13,128 - betting - DEBUG - current_proxy: None target_proxy: http://brd-customer-hl_3fa1037b-zone-datacenter_proxy1-country-ng:be0682squyj3@brd.superproxy.io:33335
-2025-08-13 00:31:13,128 - betting - DEBUG - current_proxy: None target_proxy: http://brd-customer-hl_3fa1037b-zone-datacenter_proxy1-country-ng:be0682squyj3@brd.superproxy.io:33335
-2025-08-13 00:31:13,128 - betting - INFO - Initializing browser...
-2025-08-13 00:31:13,128 - betting - INFO - Initializing browser...
-2025-08-13 00:31:13,128 - betting - INFO - Using proxy: http://brd-customer-hl_3fa1037b-zone-datacenter_proxy1-country-ng:be0682squyj3@brd.superproxy.io:33335
-2025-08-13 00:31:13,128 - betting - INFO - Using proxy: http://brd-customer-hl_3fa1037b-zone-datacenter_proxy1-country-ng:be0682squyj3@brd.superproxy.io:33335
-2025-08-13 00:31:13,128 - betting - DEBUG -   └─ From account: 8168309913
-2025-08-13 00:31:13,128 - betting - DEBUG -   └─ From account: 8168309913
-2025-08-13 00:31:14,568 - betting - INFO - Browser initialized
-2025-08-13 00:31:14,568 - betting - INFO - Browser initialized
-2025-08-13 00:31:42,827 - betting - INFO - Closing browser after account setup...
-2025-08-13 00:31:42,827 - betting - INFO - Closing browser after account setup...
-2025-08-13 00:31:42,827 - betting - DEBUG - Closing browser...
-2025-08-13 00:31:42,827 - betting - DEBUG - Closing browser...
-2025-08-13 00:31:42,932 - betting - DEBUG - Browser closed successfully
-2025-08-13 00:31:42,932 - betting - DEBUG - Browser closed successfully
-2025-08-13 00:31:42,932 - betting - DEBUG - self.__browser_initialized: False
-2025-08-13 00:31:42,932 - betting - DEBUG - self.__browser_initialized: False
-2025-08-13 00:31:42,932 - betting - DEBUG - current_proxy: http://brd-customer-hl_3fa1037b-zone-datacenter_proxy1-country-ng:be0682squyj3@brd.superproxy.io:33335 target_proxy: http://brd-customer-hl_3fa1037b-zone-datacenter_proxy1-country-ng:be0682squyj3@brd.superproxy.io:33335
-2025-08-13 00:31:42,932 - betting - DEBUG - current_proxy: http://brd-customer-hl_3fa1037b-zone-datacenter_proxy1-country-ng:be0682squyj3@brd.superproxy.io:33335 target_proxy: http://brd-customer-hl_3fa1037b-zone-datacenter_proxy1-country-ng:be0682squyj3@brd.superproxy.io:33335
-2025-08-13 00:31:42,932 - betting - INFO - Initializing browser...
-2025-08-13 00:31:42,932 - betting - INFO - Initializing browser...
-2025-08-13 00:31:42,932 - betting - INFO - Using proxy: http://brd-customer-hl_3fa1037b-zone-datacenter_proxy1-country-ng:be0682squyj3@brd.superproxy.io:33335
-2025-08-13 00:31:42,932 - betting - INFO - Using proxy: http://brd-customer-hl_3fa1037b-zone-datacenter_proxy1-country-ng:be0682squyj3@brd.superproxy.io:33335
-2025-08-13 00:31:42,932 - betting - DEBUG -   └─ From account: 8168309913
-2025-08-13 00:31:42,932 - betting - DEBUG -   └─ From account: 8168309913
-2025-08-13 00:31:44,239 - betting - INFO - Browser initialized
-2025-08-13 00:31:44,239 - betting - INFO - Browser initialized
-2025-08-13 00:44:18,977 - betting - INFO - Loaded configuration from config.json
-2025-08-13 00:44:18,977 - betting - INFO - Loaded configuration from config.json
-2025-08-13 00:44:18,978 - betting - INFO - Set up 1 betting accounts
-2025-08-13 00:44:18,978 - betting - INFO - Set up 1 betting accounts
-2025-08-13 00:44:18,978 - betting - DEBUG - self.__browser_initialized: False
-2025-08-13 00:44:18,978 - betting - DEBUG - self.__browser_initialized: False
-2025-08-13 00:44:18,978 - betting - DEBUG - current_proxy: None target_proxy: http://brd-customer-hl_3fa1037b-zone-datacenter_proxy1-country-ng:be0682squyj3@brd.superproxy.io:33335
-2025-08-13 00:44:18,978 - betting - DEBUG - current_proxy: None target_proxy: http://brd-customer-hl_3fa1037b-zone-datacenter_proxy1-country-ng:be0682squyj3@brd.superproxy.io:33335
-2025-08-13 00:44:18,978 - betting - INFO - Initializing browser...
-2025-08-13 00:44:18,978 - betting - INFO - Initializing browser...
-2025-08-13 00:44:18,978 - betting - INFO - Using proxy: http://brd-customer-hl_3fa1037b-zone-datacenter_proxy1-country-ng:be0682squyj3@brd.superproxy.io:33335
-2025-08-13 00:44:18,978 - betting - INFO - Using proxy: http://brd-customer-hl_3fa1037b-zone-datacenter_proxy1-country-ng:be0682squyj3@brd.superproxy.io:33335
-2025-08-13 00:44:18,978 - betting - DEBUG -   └─ From account: 8168309913
-2025-08-13 00:44:18,978 - betting - DEBUG -   └─ From account: 8168309913
-2025-08-13 00:44:20,506 - betting - INFO - Browser initialized
-2025-08-13 00:44:20,506 - betting - INFO - Browser initialized
-2025-08-13 00:44:46,127 - betting - INFO - Closing browser after account setup...
-2025-08-13 00:44:46,127 - betting - INFO - Closing browser after account setup...
-2025-08-13 00:44:46,128 - betting - DEBUG - Closing browser...
-2025-08-13 00:44:46,128 - betting - DEBUG - Closing browser...
-2025-08-13 00:44:46,234 - betting - DEBUG - Browser closed successfully
-2025-08-13 00:44:46,234 - betting - DEBUG - Browser closed successfully
+2025-08-12 23:48:07,338 - betting - INFO - Loaded configuration from config.json
+2025-08-12 23:48:07,338 - betting - INFO - Loaded configuration from config.json
+2025-08-12 23:48:07,339 - betting - INFO - Set up 1 betting accounts
+2025-08-12 23:48:07,339 - betting - INFO - Set up 1 betting accounts
+2025-08-12 23:48:07,339 - betting - DEBUG - self.__browser_initialized: False
+2025-08-12 23:48:07,339 - betting - DEBUG - self.__browser_initialized: False
+2025-08-12 23:48:07,339 - betting - DEBUG - current_proxy: None target_proxy: http://brd-customer-hl_3fa1037b-zone-datacenter_proxy1-country-ng:be0682squyj3@brd.superproxy.io:33335
+2025-08-12 23:48:07,339 - betting - DEBUG - current_proxy: None target_proxy: http://brd-customer-hl_3fa1037b-zone-datacenter_proxy1-country-ng:be0682squyj3@brd.superproxy.io:33335
+2025-08-12 23:48:07,339 - betting - INFO - Initializing browser...
+2025-08-12 23:48:07,339 - betting - INFO - Initializing browser...
+2025-08-12 23:48:07,339 - betting - INFO - Using proxy: http://brd-customer-hl_3fa1037b-zone-datacenter_proxy1-country-ng:be0682squyj3@brd.superproxy.io:33335
+2025-08-12 23:48:07,339 - betting - INFO - Using proxy: http://brd-customer-hl_3fa1037b-zone-datacenter_proxy1-country-ng:be0682squyj3@brd.superproxy.io:33335
+2025-08-12 23:48:07,339 - betting - DEBUG -   └─ From account: 8168309913
+2025-08-12 23:48:07,339 - betting - DEBUG -   └─ From account: 8168309913
+2025-08-12 23:48:09,724 - betting - INFO - Browser initialized
+2025-08-12 23:48:09,724 - betting - INFO - Browser initialized
+2025-08-12 23:48:37,601 - betting - INFO - Closing browser after account setup...
+2025-08-12 23:48:37,601 - betting - INFO - Closing browser after account setup...
+2025-08-12 23:48:37,601 - betting - DEBUG - Closing browser...
+2025-08-12 23:48:37,601 - betting - DEBUG - Closing browser...
+2025-08-12 23:48:37,758 - betting - DEBUG - Browser closed successfully
+2025-08-12 23:48:37,758 - betting - DEBUG - Browser closed successfully
