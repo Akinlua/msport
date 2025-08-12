@@ -1,2 +1,88 @@
 2025-08-12 23:45:47,551 - auth - INFO - Added account: 8168309913
 2025-08-12 23:45:47,551 - auth - INFO - Added account: 8168309913
+2025-08-13 00:19:05,976 - auth - INFO - Added account: 8168309913
+2025-08-13 00:19:05,976 - auth - INFO - Added account: 8168309913
+2025-08-13 00:19:05,978 - auth - INFO - Attempting initial login for all accounts...
+2025-08-13 00:19:05,978 - auth - INFO - Attempting initial login for all accounts...
+2025-08-13 00:19:05,978 - auth - INFO - Logging in to MSport with account: 8168309913
+2025-08-13 00:19:05,978 - auth - INFO - Logging in to MSport with account: 8168309913
+2025-08-13 00:19:06,161 - auth - INFO - Login error screenshot saved to login_error_20250813-001905.png
+2025-08-13 00:19:06,161 - auth - INFO - Login error screenshot saved to login_error_20250813-001905.png
+2025-08-13 00:19:06,161 - auth - WARNING - Account will be available for retry later
+2025-08-13 00:19:06,161 - auth - WARNING - Account will be available for retry later
+2025-08-13 00:24:59,060 - auth - INFO - Added account: 8168309913
+2025-08-13 00:24:59,060 - auth - INFO - Added account: 8168309913
+2025-08-13 00:24:59,061 - auth - INFO - Attempting initial login for all accounts...
+2025-08-13 00:24:59,061 - auth - INFO - Attempting initial login for all accounts...
+2025-08-13 00:24:59,061 - auth - INFO - Logging in to MSport with account: 8168309913
+2025-08-13 00:24:59,061 - auth - INFO - Logging in to MSport with account: 8168309913
+2025-08-13 00:24:59,270 - auth - INFO - Login error screenshot saved to login_error_20250813-002459.png
+2025-08-13 00:24:59,270 - auth - INFO - Login error screenshot saved to login_error_20250813-002459.png
+2025-08-13 00:24:59,271 - auth - WARNING - Account will be available for retry later
+2025-08-13 00:24:59,271 - auth - WARNING - Account will be available for retry later
+2025-08-13 00:29:44,895 - auth - INFO - Added account: 8168309913
+2025-08-13 00:29:44,895 - auth - INFO - Added account: 8168309913
+2025-08-13 00:29:44,897 - auth - INFO - Attempting initial login for all accounts...
+2025-08-13 00:29:44,897 - auth - INFO - Attempting initial login for all accounts...
+2025-08-13 00:29:44,897 - auth - INFO - Logging in to MSport with account: 8168309913
+2025-08-13 00:29:44,897 - auth - INFO - Logging in to MSport with account: 8168309913
+2025-08-13 00:29:45,054 - auth - INFO - Login error screenshot saved to login_error_20250813-002944.png
+2025-08-13 00:29:45,054 - auth - INFO - Login error screenshot saved to login_error_20250813-002944.png
+2025-08-13 00:29:45,054 - auth - WARNING - Account will be available for retry later
+2025-08-13 00:29:45,054 - auth - WARNING - Account will be available for retry later
+2025-08-13 00:30:11,384 - auth - INFO - Added account: 8168309913
+2025-08-13 00:30:11,384 - auth - INFO - Added account: 8168309913
+2025-08-13 00:30:11,385 - auth - INFO - Attempting initial login for all accounts...
+2025-08-13 00:30:11,385 - auth - INFO - Attempting initial login for all accounts...
+2025-08-13 00:30:11,385 - auth - INFO - Logging in to MSport with account: 8168309913
+2025-08-13 00:30:11,385 - auth - INFO - Logging in to MSport with account: 8168309913
+2025-08-13 00:30:11,553 - auth - INFO - Login error screenshot saved to login_error_20250813-003011.png
+2025-08-13 00:30:11,553 - auth - INFO - Login error screenshot saved to login_error_20250813-003011.png
+2025-08-13 00:30:11,553 - auth - WARNING - Account will be available for retry later
+2025-08-13 00:30:11,553 - auth - WARNING - Account will be available for retry later
+2025-08-13 00:31:13,128 - auth - INFO - Added account: 8168309913
+2025-08-13 00:31:13,128 - auth - INFO - Added account: 8168309913
+2025-08-13 00:31:13,128 - auth - INFO - Attempting initial login for all accounts...
+2025-08-13 00:31:13,128 - auth - INFO - Attempting initial login for all accounts...
+2025-08-13 00:31:13,128 - auth - INFO - Logging in to MSport with account: 8168309913
+2025-08-13 00:31:13,128 - auth - INFO - Logging in to MSport with account: 8168309913
+2025-08-13 00:31:17,332 - auth - INFO - ✅ Using proxy - Current IP address: 45.201.113.244 8168309913 http://brd-customer-hl_3fa1037b-zone-datacenter_proxy1-country-ng:be0682squyj3@brd.superproxy.io:33335
+2025-08-13 00:31:17,332 - auth - INFO - ✅ Using proxy - Current IP address: 45.201.113.244 8168309913 http://brd-customer-hl_3fa1037b-zone-datacenter_proxy1-country-ng:be0682squyj3@brd.superproxy.io:33335
+2025-08-13 00:31:22,450 - auth - INFO - Not logged in, proceeding with login process for account: 8168309913
+2025-08-13 00:31:22,450 - auth - INFO - Not logged in, proceeding with login process for account: 8168309913
+2025-08-13 00:31:36,323 - auth - INFO - Navigated to login page: https://www.msport.com
+2025-08-13 00:31:36,323 - auth - INFO - Navigated to login page: https://www.msport.com
+2025-08-13 00:31:37,486 - auth - INFO - 📱 Entered phone number: 8168309913
+2025-08-13 00:31:37,486 - auth - INFO - 📱 Entered phone number: 8168309913
+2025-08-13 00:31:37,548 - auth - INFO - 🔑 Entered password
+2025-08-13 00:31:37,548 - auth - INFO - 🔑 Entered password
+2025-08-13 00:31:37,601 - auth - INFO - 🚀 Clicked login button
+2025-08-13 00:31:37,601 - auth - INFO - 🚀 Clicked login button
+2025-08-13 00:31:40,437 - auth - INFO - Login successful for account: 8168309913
+2025-08-13 00:31:40,437 - auth - INFO - Login successful for account: 8168309913
+2025-08-13 00:31:42,826 - auth - INFO - Account 8168309913 balance: 186.35 (avlBal: 1863500, bizCode: 10000)
+2025-08-13 00:31:42,826 - auth - INFO - Account 8168309913 balance: 186.35 (avlBal: 1863500, bizCode: 10000)
+2025-08-13 00:31:42,827 - auth - INFO - Updated account balance: 186.35
+2025-08-13 00:31:42,827 - auth - INFO - Updated account balance: 186.35
+2025-08-13 00:31:42,827 - auth - INFO - Successfully logged in account: 8168309913
+2025-08-13 00:31:42,827 - auth - INFO - Successfully logged in account: 8168309913
+2025-08-13 00:31:42,932 - auth - INFO - Logging in to MSport with account: 8168309913
+2025-08-13 00:31:42,932 - auth - INFO - Logging in to MSport with account: 8168309913
+2025-08-13 00:31:45,789 - auth - INFO - ✅ Using proxy - Current IP address: 45.201.113.244 8168309913 http://brd-customer-hl_3fa1037b-zone-datacenter_proxy1-country-ng:be0682squyj3@brd.superproxy.io:33335
+2025-08-13 00:31:45,789 - auth - INFO - ✅ Using proxy - Current IP address: 45.201.113.244 8168309913 http://brd-customer-hl_3fa1037b-zone-datacenter_proxy1-country-ng:be0682squyj3@brd.superproxy.io:33335
+2025-08-13 00:31:50,877 - auth - INFO - Not logged in, proceeding with login process for account: 8168309913
+2025-08-13 00:31:50,877 - auth - INFO - Not logged in, proceeding with login process for account: 8168309913
+2025-08-13 00:32:04,610 - auth - INFO - Navigated to login page: https://www.msport.com
+2025-08-13 00:32:04,610 - auth - INFO - Navigated to login page: https://www.msport.com
+2025-08-13 00:32:04,737 - auth - INFO - 📱 Entered phone number: 8168309913
+2025-08-13 00:32:04,737 - auth - INFO - 📱 Entered phone number: 8168309913
+2025-08-13 00:32:04,789 - auth - INFO - 🔑 Entered password
+2025-08-13 00:32:04,789 - auth - INFO - 🔑 Entered password
+2025-08-13 00:32:04,832 - auth - INFO - 🚀 Clicked login button
+2025-08-13 00:32:04,832 - auth - INFO - 🚀 Clicked login button
+2025-08-13 00:32:07,614 - auth - INFO - Login successful for account: 8168309913
+2025-08-13 00:32:07,614 - auth - INFO - Login successful for account: 8168309913
+2025-08-13 00:32:10,581 - auth - INFO - Account 8168309913 balance: 186.35 (avlBal: 1863500, bizCode: 10000)
+2025-08-13 00:32:10,581 - auth - INFO - Account 8168309913 balance: 186.35 (avlBal: 1863500, bizCode: 10000)
+2025-08-13 00:32:10,582 - auth - INFO - Updated account balance: 186.35
+2025-08-13 00:32:10,582 - auth - INFO - Updated account balance: 186.35
