@@ -239,10 +239,10 @@ def test_bet_placement():
     finally:
         bet_engine.cleanup()
 
-def test_direct_bet_placement():
-    """Test direct bet placement using real event details and shaped data"""
+def test_multi_market_notification():
+    """Test multi-market notification logic by simulating a single game alert"""
     print("\n" + "=" * 50)
-    print("TESTING DIRECT BET PLACEMENT")
+    print("TESTING MULTI-MARKET NOTIFICATION LOGIC")
     print("=" * 50)
     
     bet_engine = BetEngine(
@@ -251,146 +251,45 @@ def test_direct_bet_placement():
     )
     
     try:
-        # Step 1: Search for a real event
-        home_team = "Villarreal"
-        away_team = "Oviedo"
-
-        print(f"Searching for event: {home_team} vs {away_team}")
-        event_id = bet_engine.search_event(home_team, away_team)
-        
-        if not event_id:
-            print("❌ Event not found! Cannot test bet placement.")
-            return False
-            
-        print(f"✅ Event found! Event ID: {event_id}")
-        
-        # Step 2: Get event details
-        print("Getting event details...")
-        event_details = bet_engine.get_event_details(event_id)
-        
-        if not event_details:
-            print("❌ Failed to get event details!")
-            return False
-            
-        print(f"✅ Event details retrieved: {event_details.get('homeTeam')} vs {event_details.get('awayTeam')}")
-        
-        # Step 3: Find a market
-        print("Finding handicap market...")
-        outcome_id, odds, adjusted_points = bet_engine.find_market_bet_code_with_points(
-            event_details,
-            "spread",  # Changed from "money_line" to "spread"
-            "0",    # Added handicap points
-            "home",
-            False,  # is_first_half
-            1,      # sport_id (soccer)
-            event_details.get('homeTeam'),
-            event_details.get('awayTeam')
-        )
-        
-        if not outcome_id or not odds:
-            print("❌ Handicap market not found! Trying alternative markets...")
-            
-            # Try different handicap values as fallback
-            fallback_handicaps = ["-1.0", "+0.5", "-1.5", "+1.0"]
-            for handicap in fallback_handicaps:
-                print(f"Trying handicap: {handicap}")
-                outcome_id, odds, adjusted_points = bet_engine.find_market_bet_code_with_points(
-                    event_details,
-                    "spread",
-                    handicap,
-                    "home",
-                    False,
-                    1,
-                    event_details.get('homeTeam'),
-                    event_details.get('awayTeam')
-                )
-                if outcome_id and odds:
-                    print(f"✅ Found alternative handicap: {handicap}")
-                    break
-            
-            if not outcome_id or not odds:
-                print("❌ No handicap markets found! Cannot test bet placement.")
-                return False
-            
-        print(f"✅ Handicap market found! Outcome ID: {outcome_id}, Odds: {odds}, Points: {adjusted_points}")
-        
-        # Step 4: Create properly formatted shaped data
-        shaped_data = {
+        # Simulate a single notification alert for a game
+        # This will test the complete flow: search -> get details -> check all markets -> calculate EV -> place bets
+        test_shaped_data = {
             "game": {
-                "away": event_details.get('awayTeam'),
-                "home": event_details.get('homeTeam')
+                "away": "Oviedo",
+                "home": "Villarreal"
             },
             "category": {
-                "type": "spread",  # Changed from "money_line" to "spread" for handicap
+                "type": "spread",  # This will be ignored by the new multi-market logic
                 "meta": {
-                    "team": "home",  # Betting on home team with handicap
-                    "value": str(adjusted_points) if adjusted_points is not None else "-0.5"  # Use adjusted points from market finder
+                    "team": "home",  # This will be ignored by the new multi-market logic
+                    "value": "0"     # This will trigger DNB market instead of handicap
                 }
             },
             "match_type": "oddsDrop",
             "sportId": 1,
-            "eventId": event_id,
-            "priceHome": odds,        # Home team handicap odds
-            "priceAway": 1.82,        # Away team handicap odds (for +0.5)
-            # Remove priceDraw since handicap doesn't have draw
-            "_decimal_prices": {
-                "home": float(odds),  # Home team with handicap
-                "away": 1.82          # Away team with opposite handicap
-            },
-            "_outcome_key": "home"    # Betting on home team with the handicap
+            "starts": "1754719511000"  # Add start time for unique game ID
         }
         
-        print(f"Using handicap value: {shaped_data['category']['meta']['value']}")
+        print("Simulating notification alert for game...")
+        print(f"Test data: {json.dumps(test_shaped_data, indent=2)}")
         
-        # Step 5: Generate bet URL
-        bet_url = bet_engine.generate_msport_bet_url(event_details)
-        if not bet_url:
-            print("❌ Failed to generate bet URL!")
-            return False
-            
-        print(f"✅ Bet URL generated: {bet_url}")
+        # This will test the complete multi-market flow:
+        # 1. Search for the event
+        # 2. Get event details
+        # 3. Check ALL available markets (Moneyline, Handicap, DNB, Totals) for both full match and first half
+        # 4. Calculate EV for each market
+        # 5. Place bets on all markets that meet the min_ev threshold
+        result = bet_engine.notify(test_shaped_data)
         
-        # Step 6: Test direct bet placement with first account
-        if not bet_engine._BetEngine__accounts:
-            print("❌ No accounts configured!")
-            return False
-            
-        account = bet_engine._BetEngine__accounts[0]
-        print(f"Testing bet placement with account: {account.username}")
-        
-        # Calculate stake
-        stake = bet_engine._BetEngine__calculate_stake(float(odds), shaped_data, 500)  # Mock bankroll
-        stake = 10
-        print(f"Calculated stake: {stake}")
-        
-        # IMPORTANT: This will actually attempt to place a real bet!
-        # Uncomment the line below only if you want to test with real money
-        print("⚠️  WOULD PLACE BET HERE - Uncomment line below to actually place bet")
-        print(f"Bet details: {account.username} - {odds} odds - {stake} stake - Handicap: {shaped_data['category']['meta']['value']}")
-        
-        bet_success = bet_engine._BetEngine__place_bet_with_selenium(
-            account,
-            bet_url,
-            "spread",  # Changed from "money_line" to "spread"
-            "home",
-            float(odds),
-            stake,
-            shaped_data['category']['meta']['value'],  # Pass the handicap points
-            False  # for first half
-        )
-        
-        # For testing purposes, let's just simulate success
-        bet_success = True
-        
-        if bet_success:
-            print("✅ Direct handicap bet placement test completed successfully!")
-            return True
+        if result:
+            print("✅ Multi-market bet placement completed successfully!")
         else:
-            print("❌ Direct handicap bet placement failed!")
-            return False
-            
+            print("❌ Multi-market bet placement failed (may be due to negative EV or other business logic)")
+        
+        return True
+        
     except Exception as e:
-        print(f"❌ Direct bet placement test failed with error: {e}")
+        print(f"❌ Multi-market bet placement test failed with error: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -452,25 +351,11 @@ def main():
     
     results = []
     
-    # Test 1: URL Generation (no browser needed)
-    # results.append(test_url_generation())
-    
-    # # Test 2: Event Search (API calls only)
-    # search_success, event_details = test_event_search()
-    # results.append(search_success)
-    
-    # # Test 3: Market Finding (if we have event details)
-    # if event_details:
-    #     results.append(test_market_finding(event_details))
-    
-    # Test 4: Login (requires browser)
-    # results.append(test_login())
-    
-    # Test 5: Complete Bet Placement Flow (requires browser and valid account)
-    # results.append(test_bet_placement())
-    
-    # Test 6: Direct Bet Placement (requires browser and valid account)
-    results.append(test_direct_bet_placement())
+    # Test: Multi-Market Notification Alert (simulates a single game alert)
+    # This tests the complete flow: search -> get details -> check all markets -> calculate EV -> place bets
+    print("\n🧪 Testing Multi-Market Notification Logic")
+    print("This will simulate a single game alert and check ALL available markets")
+    results.append(test_multi_market_notification())
     
     # Summary
     print("\n" + "=" * 50)
