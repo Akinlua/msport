@@ -49,7 +49,7 @@ def setup_odds_logging():
 odds_logger, error_logger = setup_odds_logging()
 
 # Set up main logger for console output
-logger = logging.getLogger()
+logger = logging.getLogger('msport_odds')
 logger.setLevel(logging.INFO)
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.INFO)

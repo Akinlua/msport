@@ -84,7 +84,7 @@ os.makedirs('logs', exist_ok=True)
 bet_logger, odds_logger, auth_logger, error_logger = setup_logging()
 
 # Set up main logger for console output
-logger = logging.getLogger()
+logger = logging.getLogger('msport_betting')
 logger.setLevel(logging.INFO)
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.INFO)

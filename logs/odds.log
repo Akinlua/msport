@@ -1,5 +1,0 @@
-2025-08-12 23:48:37,759 - odds_engine - INFO - Starting odds monitoring with interval of 60 seconds
-2025-08-12 23:48:37,759 - odds_engine - INFO - Started odds monitoring thread with interval of 60 seconds
-2025-08-12 23:48:37,760 - odds_engine - DEBUG - Getting odds at 2025-08-12 23:48:37
-2025-08-12 23:48:37,760 - odds_engine - DEBUG - Looking back 1755042397760 milliseconds
-2025-08-12 23:48:37,973 - odds_engine - DEBUG - No new alerts
