@@ -1641,11 +1641,11 @@ class BetEngine(WebsiteOpener):
             total_current_bets = sum(account.current_bets for account in self.__accounts)
             
             # Check if we've reached the global limit
-            if total_current_bets >= max_total_bets:
-                logger.warning(f"Reached global limit of {max_total_bets} concurrent bets. Queuing bet.")
-                # Re-add to queue with a delay
-                threading.Timer(30.0, lambda: self.__bet_queue.put(bet_data)).start()
-                return False
+            # if total_current_bets >= max_total_bets:
+            #     logger.warning(f"Reached global limit of {max_total_bets} concurrent bets. Queuing bet.")
+            #     # Re-add to queue with a delay
+            #     threading.Timer(30.0, lambda: self.__bet_queue.put(bet_data)).start()
+            #     return False
             
             # Track if at least one bet was placed successfully
             any_bet_placed = False
@@ -1692,9 +1692,9 @@ class BetEngine(WebsiteOpener):
                     logger.debug(f"Account {account.username} cannot place bet")
             
             if not any_bet_placed:
-                logger.warning("No available accounts to place bet. Queuing for retry.")
+                logger.warning("No available accounts to place bet.")
                 # Re-add to queue with a delay
-                threading.Timer(60.0, lambda: self.__bet_queue.put(bet_data)).start()
+                # threading.Timer(60.0, lambda: self.__bet_queue.put(bet_data)).start()
                 return False
             
             return any_bet_placed
