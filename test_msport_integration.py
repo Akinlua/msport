@@ -28,7 +28,7 @@ def setup_test_logging():
     
     # File handlers for different components
     test_handler = logging.FileHandler('logs/tests.log')
-    test_handler.setLevel(logging.DEBUG)
+    test_handler.setLevel(logging.info)
     test_handler.setFormatter(detailed_formatter)
     
     error_handler = logging.FileHandler('logs/errors.log')
@@ -37,7 +37,7 @@ def setup_test_logging():
     
     # Create loggers
     test_logger = logging.getLogger('tests')
-    test_logger.setLevel(logging.DEBUG)
+    test_logger.setLevel(logging.info)
     test_logger.addHandler(test_handler)
     test_logger.addHandler(console_handler)
     

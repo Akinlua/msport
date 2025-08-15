@@ -25,7 +25,7 @@ def setup_odds_logging():
     
     # File handlers for different components
     odds_handler = logging.FileHandler('logs/odds.log')
-    odds_handler.setLevel(logging.DEBUG)
+    odds_handler.setLevel(logging.info)
     odds_handler.setFormatter(detailed_formatter)
     
     error_handler = logging.FileHandler('logs/errors.log')
@@ -34,7 +34,7 @@ def setup_odds_logging():
     
     # Create loggers
     odds_logger = logging.getLogger('odds_engine')
-    odds_logger.setLevel(logging.DEBUG)
+    odds_logger.setLevel(logging.info)
     odds_logger.addHandler(odds_handler)
     odds_logger.addHandler(console_handler)
     
@@ -141,7 +141,7 @@ class OddsEngine:
         lookback_time = current_time - (60 * 2 * 1000)
         # lookback_time = 1747423479000
 
-        logger.debug(f"Looking back {lookback_time} milliseconds")
+        logger.info(f"Looking back {lookback_time} milliseconds")
         
         try:
             response = requests.get(
@@ -154,17 +154,17 @@ class OddsEngine:
                 
             data = response.json()
             if "data" not in data or not data["data"]:
-                logger.debug("No new alerts")
+                logger.info("No new alerts")
                 return
                 
-            logger.debug(f"Retrieved {len(data['data'])} alerts")
+            logger.info(f"Retrieved {len(data['data'])} alerts")
             
             # Process each alert
             for alert in data["data"]:
                 # Log alert timestamp
                 alert_timestamp = int(alert.get("timestamp", 0))
                 alert_time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(alert_timestamp/1000))
-                logger.debug(f"Processing alert with timestamp: {alert_time_str}")
+                logger.info(f"Processing alert with timestamp: {alert_time_str}")
                 
                 self.__process_alert(alert)
                 
@@ -186,9 +186,9 @@ class OddsEngine:
         # If alert is less than a minute old, wait until it's a minute old
         if time_diff_ms < 60000:  # 60000 ms = 1 minute
             wait_time_seconds = (60000 - time_diff_ms) / 1000
-            logger.debug(f"Alert is only {time_diff_ms/1000:.1f} seconds old. Waiting {wait_time_seconds:.1f} seconds before processing.")
+            logger.info(f"Alert is only {time_diff_ms/1000:.1f} seconds old. Waiting {wait_time_seconds:.1f} seconds before processing.")
             time.sleep(wait_time_seconds)
-            logger.debug("Resuming alert processing after wait period.")
+            logger.info("Resuming alert processing after wait period.")
         
         # Get alert identifiers
         alert_id = alert.get("eventId", "")
@@ -200,24 +200,24 @@ class OddsEngine:
         
         # Skip if we've already processed this alert ID
         if alert_direct_id and alert_direct_id in self.__processed_alerts_ids:
-            logger.debug(f"Skipping already processed alert ID: {alert_direct_id}")
+            logger.info(f"Skipping already processed alert ID: {alert_direct_id}")
             return
         
         # Skip if we've already processed this event + line type combination
         if event_line_key in self.__processed_event_line_types:
-            logger.debug(f"Skipping already processed event + line type: {event_line_key}")
+            logger.info(f"Skipping already processed event + line type: {event_line_key}")
             return
             
         # Skip alerts with "(Corners)" in team names
         home_team = alert.get("home", "")
         away_team = alert.get("away", "")
         if "(Corners)" in home_team or "(Corners)" in away_team:
-            logger.debug(f"Skipping corners market: {home_team} vs {away_team}")
+            logger.info(f"Skipping corners market: {home_team} vs {away_team}")
             self.__processed_alerts.add(alert_id)
             self.__processed_event_line_types.add(event_line_key)
             if alert_direct_id:
                 self.__processed_alerts_ids.add(alert_direct_id)
-                logger.debug(f"Added alert ID {alert_direct_id} to processed_alerts_ids")
+                logger.info(f"Added alert ID {alert_direct_id} to processed_alerts_ids")
             self.__last_processed_timestamp = max(self.__last_processed_timestamp, int(alert.get("timestamp", 0)))
             
             # Limit the size of processed alerts set to prevent memory growth
@@ -243,13 +243,13 @@ class OddsEngine:
         if match_start_time <= current_time_ms:
             match_start_datetime = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(match_start_time/1000))
             current_datetime = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(current_time_ms/1000))
-            logger.debug(f"Skipping alert for match that already started: {home_team} vs {away_team}")
-            logger.debug(f"Match start time (GMT): {match_start_datetime}, Current time (GMT): {current_datetime}")
+            logger.info(f"Skipping alert for match that already started: {home_team} vs {away_team}")
+            logger.info(f"Match start time (GMT): {match_start_datetime}, Current time (GMT): {current_datetime}")
             self.__processed_alerts.add(alert_id)
             self.__processed_event_line_types.add(event_line_key)
             if alert_direct_id:
                 self.__processed_alerts_ids.add(alert_direct_id)
-                logger.debug(f"Added alert ID {alert_direct_id} to processed_alerts_ids")
+                logger.info(f"Added alert ID {alert_direct_id} to processed_alerts_ids")
             self.__last_processed_timestamp = max(self.__last_processed_timestamp, int(alert.get("timestamp", 0)))
             
             # Limit the size of processed alerts set to prevent memory growth
@@ -270,12 +270,12 @@ class OddsEngine:
         
         # Send to bet engine if valid
         if shaped_data:
-            logger.debug(f"Sending alert to bet engine: {shaped_data['game']['home']} vs {shaped_data['game']['away']} - {shaped_data['category']['type']}")
+            logger.info(f"Sending alert to bet engine: {shaped_data['game']['home']} vs {shaped_data['game']['away']} - {shaped_data['category']['type']}")
             bet_processed = self.__notify_bet_engine(shaped_data)
             
             # Only add to processed collections if bet was successfully processed
             if bet_processed:
-                logger.debug(f"Bet was successfully processed, adding to processed collections")
+                logger.info(f"Bet was successfully processed, adding to processed collections")
                 self.__processed_alerts.add(alert_id)
                 self.__processed_event_line_types.add(event_line_key)
                 self.__last_processed_timestamp = max(self.__last_processed_timestamp, int(alert.get("timestamp", 0)))
@@ -290,7 +290,7 @@ class OddsEngine:
             else:
                 if alert_direct_id:
                     self.__processed_alerts_ids.add(alert_direct_id)
-                    logger.debug(f"Added alert ID {alert_direct_id} to processed_alerts_ids")
+                    logger.info(f"Added alert ID {alert_direct_id} to processed_alerts_ids")
                  # Limit the size of processed alerts IDs set
                 if len(self.__processed_alerts_ids) > 3000:
                     self.__processed_alerts_ids = set(list(self.__processed_alerts_ids)[-3000:])
@@ -305,9 +305,9 @@ class OddsEngine:
                 # Also limit the event + line type combinations set
                 if len(self.__processed_event_line_types) > 2000:
                     self.__processed_event_line_types = set(list(self.__processed_event_line_types)[-2000:])
-                logger.debug(f"Bet was not successfully processed, still adding to processed collections")
+                logger.info(f"Bet was not successfully processed, still adding to processed collections")
         else:
-            logger.debug(f"Invalid shaped data for alert, not adding to processed collections")
+            logger.info(f"Invalid shaped data for alert, not adding to processed collections")
     
     def __shape_alert_data(self, alert):
         """
@@ -322,12 +322,12 @@ class OddsEngine:
         # Check for required fields
         required_fields = ["home", "away", "lineType", "outcome"]
         if not all(field in alert for field in required_fields):
-            logger.debug(f"Alert missing required fields: {alert}")
+            logger.info(f"Alert missing required fields: {alert}")
             return None
             
         # Get sport id (1 for soccer, 3 for basketball)
-        logger.debug("alert ________________________")
-        logger.debug(alert)
+        logger.info("alert ________________________")
+        logger.info(alert)
         sport_id = alert.get("sportId", 0)  # Default to soccer if not specified
         
         shaped_data = {
