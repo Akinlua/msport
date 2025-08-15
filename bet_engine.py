@@ -1849,65 +1849,81 @@ class BetEngine(WebsiteOpener):
             
             # Extract the period data
             periods = event_data["data"].get("periods", {})
+            if not periods:  # Check if periods is None or empty
+                logger.info("No periods data found in Pinnacle API response")
+                return None
+                
             period = periods.get(period_key, {})
+            if not period:  # Check if period is None or empty
+                logger.info(f"No period data found for period key: {period_key}")
+                return None
             
             # Extract the appropriate odds based on line type
             decimal_prices = {}
             
             if line_type == "money_line":
                 money_line = period.get("money_line", {})
-                if "home" in money_line:
-                    decimal_prices["home"] = float(money_line["home"])
-                if "away" in money_line:
-                    decimal_prices["away"] = float(money_line["away"])
-                if "draw" in money_line:
-                    decimal_prices["draw"] = float(money_line["draw"])
+                if money_line:  # Check if money_line data exists
+                    if "home" in money_line:
+                        decimal_prices["home"] = float(money_line["home"])
+                    if "away" in money_line:
+                        decimal_prices["away"] = float(money_line["away"])
+                    if "draw" in money_line:
+                        decimal_prices["draw"] = float(money_line["draw"])
+                else:
+                    logger.info("No money_line data found in period")
                     
             elif line_type == "spread":
                 spreads = period.get("spreads", {})
-                # Find the closest spread to the points value
-                closest_spread = None
-                min_diff = float('inf')
-                
-                for spread_key, spread_data in spreads.items():
-                    try:
-                        spread_points = float(spread_data.get("hdp", 0))
-                        diff = abs(float(points) - spread_points)
-                        
-                        if diff < min_diff:
-                            min_diff = diff
-                            closest_spread = spread_data
-                    except (ValueError, TypeError):
-                        continue
-                
-                if closest_spread:
-                    if "home" in closest_spread:
-                        decimal_prices["home"] = float(closest_spread["home"])
-                    if "away" in closest_spread:
-                        decimal_prices["away"] = float(closest_spread["away"])
+                if spreads:  # Check if spreads data exists
+                    # Find the closest spread to the points value
+                    closest_spread = None
+                    min_diff = float('inf')
+                    
+                    for spread_key, spread_data in spreads.items():
+                        try:
+                            spread_points = float(spread_data.get("hdp", 0))
+                            diff = abs(float(points) - spread_points)
+                            
+                            if diff < min_diff:
+                                min_diff = diff
+                                closest_spread = spread_data
+                        except (ValueError, TypeError):
+                            continue
+                    
+                    if closest_spread:
+                        if "home" in closest_spread:
+                            decimal_prices["home"] = float(closest_spread["home"])
+                        if "away" in closest_spread:
+                            decimal_prices["away"] = float(closest_spread["away"])
+                else:
+                    logger.info("No spreads data found in period")
                     
             elif line_type == "total":
                 totals = period.get("totals", {})
-                # Find the closest total to the points value
-                closest_total = None
-                min_diff = float('inf')
-                
-                for total_key, total_data in totals.items():
-                    try:
-                        total_points = float(total_data.get("points", 0))
-                        diff = abs(float(points) - total_points)
-                        
-                        if diff < min_diff:
-                            min_diff = diff
-                            closest_total = total_data
-                    except (ValueError, TypeError):
-                        continue
-                
-                if closest_total:
-                    if "over" in closest_total:
-                        decimal_prices["home"] = float(closest_total["over"])  # Over as home
-                    if "under" in closest_total:
-                        decimal_prices["away"] = float(closest_total["under"])  # Under as away
+                if totals:  # Check if totals data exists
+                    # Find the closest total to the points value
+                    closest_total = None
+                    min_diff = float('inf')
+                    
+                    for total_key, total_data in totals.items():
+                        try:
+                            total_points = float(total_data.get("points", 0))
+                            diff = abs(float(points) - total_points)
+                            
+                            if diff < min_diff:
+                                min_diff = diff
+                                closest_total = total_data
+                        except (ValueError, TypeError):
+                            continue
+                    
+                    if closest_total:
+                        if "over" in closest_total:
+                            decimal_prices["home"] = float(closest_total["over"])  # Over as home
+                        if "under" in closest_total:
+                            decimal_prices["away"] = float(closest_total["under"])  # Under as away
+                else:
+                    logger.info("No totals data found in period")
             
             return decimal_prices if decimal_prices else None
             
