@@ -7,46 +7,46 @@ import threading
 import logging
 from datetime import datetime, timedelta
 
-# Set up logging for odds engine
-def setup_odds_logging():
-    """Set up structured logging for the odds engine"""
-    # Create formatters
-    detailed_formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    simple_formatter = logging.Formatter(
-        '%(asctime)s - %(levelname)s - %(message)s'
-    )
+# # Set up logging for odds engine
+# def setup_odds_logging():
+#     """Set up structured logging for the odds engine"""
+#     # Create formatters
+#     detailed_formatter = logging.Formatter(
+#         '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+#     )
+#     simple_formatter = logging.Formatter(
+#         '%(asctime)s - %(levelname)s - %(message)s'
+#     )
     
-    # Create handlers
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(simple_formatter)
+#     # Create handlers
+#     console_handler = logging.StreamHandler()
+#     console_handler.setLevel(logging.INFO)
+#     console_handler.setFormatter(simple_formatter)
     
-    # File handlers for different components
-    odds_handler = logging.FileHandler('logs/odds.log')
-    odds_handler.setLevel(logging.info)
-    odds_handler.setFormatter(detailed_formatter)
+#     # File handlers for different components
+#     odds_handler = logging.FileHandler('logs/odds.log')
+#     odds_handler.setLevel(logging.info)
+#     odds_handler.setFormatter(detailed_formatter)
     
-    error_handler = logging.FileHandler('logs/errors.log')
-    error_handler.setLevel(logging.ERROR)
-    error_handler.setFormatter(detailed_formatter)
+#     error_handler = logging.FileHandler('logs/errors.log')
+#     error_handler.setLevel(logging.ERROR)
+#     error_handler.setFormatter(detailed_formatter)
     
-    # Create loggers
-    odds_logger = logging.getLogger('odds_engine')
-    odds_logger.setLevel(logging.info)
-    odds_logger.addHandler(odds_handler)
-    odds_logger.addHandler(console_handler)
+#     # Create loggers
+#     odds_logger = logging.getLogger('odds_engine')
+#     odds_logger.setLevel(logging.info)
+#     odds_logger.addHandler(odds_handler)
+#     odds_logger.addHandler(console_handler)
     
-    error_logger = logging.getLogger('odds_errors')
-    error_logger.setLevel(logging.ERROR)
-    error_logger.addHandler(error_handler)
-    error_logger.addHandler(console_handler)
+#     error_logger = logging.getLogger('odds_errors')
+#     error_logger.setLevel(logging.ERROR)
+#     error_logger.addHandler(error_handler)
+#     error_logger.addHandler(console_handler)
     
-    return odds_logger, error_logger
+#     return odds_logger, error_logger
 
 # Initialize loggers
-odds_logger, error_logger = setup_odds_logging()
+# odds_logger, error_logger = setup_odds_logging()
 
 # Set up main logger for console output
 logger = logging.getLogger('msport_odds')

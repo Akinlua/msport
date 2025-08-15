@@ -21,67 +21,67 @@ from captcha_solver import CaptchaSolver
 
 dotenv.load_dotenv()
 
-# Set up logging
-def setup_logging():
-    """Set up structured logging for the betting system"""
-    # Create formatters
-    detailed_formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    simple_formatter = logging.Formatter(
-        '%(asctime)s - %(levelname)s - %(message)s'
-    )
+# # Set up logging
+# def setup_logging():
+#     """Set up structured logging for the betting system"""
+#     # Create formatters
+#     detailed_formatter = logging.Formatter(
+#         '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+#     )
+#     simple_formatter = logging.Formatter(
+#         '%(asctime)s - %(levelname)s - %(message)s'
+#     )
     
-    # Create handlers
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(simple_formatter)
+#     # Create handlers
+#     console_handler = logging.StreamHandler()
+#     console_handler.setLevel(logging.INFO)
+#     console_handler.setFormatter(simple_formatter)
     
-    # File handlers for different components
-    bet_handler = logging.FileHandler('logs/betting.log')
-    bet_handler.setLevel(logging.INFO)
-    bet_handler.setFormatter(detailed_formatter)
+#     # File handlers for different components
+#     bet_handler = logging.FileHandler('logs/betting.log')
+#     bet_handler.setLevel(logging.INFO)
+#     bet_handler.setFormatter(detailed_formatter)
     
-    odds_handler = logging.FileHandler('logs/odds.log')
-    odds_handler.setLevel(logging.INFO)
-    odds_handler.setFormatter(detailed_formatter)
+#     odds_handler = logging.FileHandler('logs/odds.log')
+#     odds_handler.setLevel(logging.INFO)
+#     odds_handler.setFormatter(detailed_formatter)
     
-    auth_handler = logging.FileHandler('logs/auth.log')
-    auth_handler.setLevel(logging.INFO)
-    auth_handler.setFormatter(detailed_formatter)
+#     auth_handler = logging.FileHandler('logs/auth.log')
+#     auth_handler.setLevel(logging.INFO)
+#     auth_handler.setFormatter(detailed_formatter)
     
-    error_handler = logging.FileHandler('logs/errors.log')
-    error_handler.setLevel(logging.ERROR)
-    error_handler.setFormatter(detailed_formatter)
+#     error_handler = logging.FileHandler('logs/errors.log')
+#     error_handler.setLevel(logging.ERROR)
+#     error_handler.setFormatter(detailed_formatter)
     
-    # Create loggers
-    bet_logger = logging.getLogger('betting')
-    bet_logger.setLevel(logging.INFO)
-    bet_logger.addHandler(bet_handler)
-    bet_logger.addHandler(console_handler)
+#     # Create loggers
+#     bet_logger = logging.getLogger('betting')
+#     bet_logger.setLevel(logging.INFO)
+#     bet_logger.addHandler(bet_handler)
+#     bet_logger.addHandler(console_handler)
     
-    odds_logger = logging.getLogger('odds')
-    odds_logger.setLevel(logging.INFO)
-    odds_logger.addHandler(odds_handler)
-    odds_logger.addHandler(console_handler)
+#     odds_logger = logging.getLogger('odds')
+#     odds_logger.setLevel(logging.INFO)
+#     odds_logger.addHandler(odds_handler)
+#     odds_logger.addHandler(console_handler)
     
-    auth_logger = logging.getLogger('auth')
-    auth_logger.setLevel(logging.INFO)
-    auth_logger.addHandler(auth_handler)
-    auth_logger.addHandler(console_handler)
+#     auth_logger = logging.getLogger('auth')
+#     auth_logger.setLevel(logging.INFO)
+#     auth_logger.addHandler(auth_handler)
+#     auth_logger.addHandler(console_handler)
     
-    error_logger = logging.getLogger('errors')
-    error_logger.setLevel(logging.ERROR)
-    error_logger.addHandler(error_handler)
-    error_logger.addHandler(console_handler)
+#     error_logger = logging.getLogger('errors')
+#     error_logger.setLevel(logging.ERROR)
+#     error_logger.addHandler(error_handler)
+#     error_logger.addHandler(console_handler)
     
-    return bet_logger, odds_logger, auth_logger, error_logger
+#     return bet_logger, odds_logger, auth_logger, error_logger
 
 # Create logs directory if it doesn't exist
 os.makedirs('logs', exist_ok=True)
 
 # Initialize loggers
-bet_logger, odds_logger, auth_logger, error_logger = setup_logging()
+# bet_logger, odds_logger, auth_logger, error_logger = setup_logging()
 
 # Set up main logger for console output
 logger = logging.getLogger('msport_betting')
@@ -178,7 +178,7 @@ class BetEngine(WebsiteOpener):
         self.__skip_initial_login = skip_initial_login
         
         # Set up logging
-        self.bet_logger, self.odds_logger, self.auth_logger, self.error_logger = setup_logging()
+        # self.bet_logger, self.odds_logger, self.auth_logger, self.error_logger = setup_logging()
         
         # Initialize configuration
         self.__config = {}
