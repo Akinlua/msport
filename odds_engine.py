@@ -125,7 +125,7 @@ class OddsEngine:
         
         while self.__running:
             try:
-                logger.debug(f"Getting odds at {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
+                logger.info(f"Getting odds at {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
                 self.get_odds()
                 time.sleep(interval)
             except Exception as e:
