@@ -1110,6 +1110,7 @@ class BetEngine(WebsiteOpener):
                     # Clear and enter stake with Selenium
                     stake_input.clear()
                     # time.sleep(0.5)
+                    # stake_input.send_keys(str(stake))
                     stake_input.send_keys(str(10))
                     logger.info(f"Entered stake using Selenium fallback: 10")
                     # time.sleep(1)
@@ -1676,7 +1677,7 @@ class BetEngine(WebsiteOpener):
                         bet_data["market_type"],
                         bet_data["outcome"],
                         bet_data["odds"],
-                        self.__calculate_stake(bet_data["odds"], bet_data["shaped_data"], account.balance),
+                        bet_data["stake"],  # Use pre-calculated stake
                         bet_data["shaped_data"]["category"]["meta"].get("value"),
                         bet_data.get("is_first_half", False)
                     )
@@ -1827,8 +1828,8 @@ class BetEngine(WebsiteOpener):
         proxies = None
         if self.__accounts and hasattr(self.__accounts[0], 'get_proxies'):
             proxies = self.__accounts[0].get_proxies()
-            if proxies:
-                logger.info(f"Using proxy for Pinnacle odds: {self.__accounts[0].proxy}")
+            # if proxies:
+            #     # logger.info(f"Using proxy for Pinnacle odds: {self.__accounts[0].proxy}")
             
         try:
             url = f"{pinnacle_api_host}/events/{event_id}"
@@ -2116,7 +2117,7 @@ class BetEngine(WebsiteOpener):
         Check all available markets for a game and return those that meet EV threshold
         
         Returns:
-        - List of tuples: (market_type, outcome, odds, points, ev, is_first_half)
+        - List of tuples: (market_type, outcome, odds, points, ev, is_first_half, stake)
         """
         available_markets = []
         
@@ -2146,8 +2147,10 @@ class BetEngine(WebsiteOpener):
                     
                     ev = self.__calculate_ev(odds, modified_shaped_data)
                     if ev > self.__min_ev:
-                        available_markets.append(("money_line", outcome, odds, None, ev, is_first_half))
-                        logger.info(f"Moneyline{period_suffix} {outcome}: EV {ev:.2f}% (odds: {odds})")
+                        # Calculate stake for this specific market
+                        stake = self.__calculate_stake_for_market(odds, modified_shaped_data, self.__config["bet_settings"]["bankroll"])
+                        available_markets.append(("money_line", outcome, odds, None, ev, is_first_half, stake))
+                        # logger.info(f"Moneyline{period_suffix} {outcome}: EV {ev:.2f}% (odds: {odds}, stake: {stake:.2f})")
         
         # Check Total markets (Over/Under)
         for is_first_half in [False, True]:
@@ -2171,9 +2174,10 @@ class BetEngine(WebsiteOpener):
                         
                         ev = self.__calculate_ev(odds, modified_shaped_data)
                         if ev > self.__min_ev:
-                            available_markets.append(("total", outcome, odds, actual_points, ev, is_first_half))
-                            logger.info(f"Total{period_suffix} {outcome} {actual_points}: EV {ev:.2f}% (odds: {odds})")
-                        # break  continue addin
+                            # Calculate stake for this specific market
+                            stake = self.__calculate_stake_for_market(odds, modified_shaped_data, self.__config["bet_settings"]["bankroll"])
+                            available_markets.append(("total", outcome, odds, actual_points, ev, is_first_half, stake))
+                            # logger.info(f"Total{period_suffix} {outcome} {actual_points}: EV {ev:.2f}% (odds: {odds}, stake: {stake:.2f})")
         
         # Check Asian Handicap markets
         for is_first_half in [False, True]:
@@ -2197,9 +2201,10 @@ class BetEngine(WebsiteOpener):
                         
                         ev = self.__calculate_ev(odds, modified_shaped_data)
                         if ev > self.__min_ev:
-                            available_markets.append(("spread", outcome, odds, actual_points, ev, is_first_half))
-                            logger.info(f"Handicap{period_suffix} {outcome} {actual_points}: EV {ev:.2f}% (odds: {odds})")
-                        # break  # Found a valid handicap market, move to next outcome
+                            # Calculate stake for this specific market
+                            stake = self.__calculate_stake_for_market(odds, modified_shaped_data, self.__config["bet_settings"]["bankroll"])
+                            available_markets.append(("spread", outcome, odds, actual_points, ev, is_first_half, stake))
+                            # logger.info(f"Handicap{period_suffix} {outcome} {actual_points}: EV {ev:.2f}% (odds: {odds}, stake: {stake:.2f})")
         
         # Check DNB markets (when handicap is 0)
         for is_first_half in [False, True]:
@@ -2221,8 +2226,10 @@ class BetEngine(WebsiteOpener):
                     
                     ev = self.__calculate_ev(odds, modified_shaped_data)
                     if ev > self.__min_ev:
-                        available_markets.append(("DNB", outcome, odds, 0.0, ev, is_first_half))
-                        logger.info(f"DNB{period_suffix} {outcome}: EV {ev:.2f}% (odds: {odds})")
+                        # Calculate stake for this specific market
+                        stake = self.__calculate_stake_for_market(odds, modified_shaped_data, self.__config["bet_settings"]["bankroll"])
+                        available_markets.append(("DNB", outcome, odds, 0.0, ev, is_first_half, stake))
+                        # logger.info(f"DNB{period_suffix} {outcome}: EV {ev:.2f}% (odds: {odds}, stake: {stake:.2f})")
         
         logger.info(f"Found {len(available_markets)} markets with positive EV for {home_team} vs {away_team}")
         logger.info(f"{available_markets}")
@@ -2286,7 +2293,7 @@ class BetEngine(WebsiteOpener):
             
             # Step 4: Place bets for all markets that meet EV threshold
             bets_placed = 0
-            for market_type, outcome, odds, points, ev, is_first_half in available_markets:
+            for market_type, outcome, odds, points, ev, is_first_half, stake in available_markets:
                 try:
                     period_suffix = " (1st Half)" if is_first_half else ""
                     logger.info(f"Placing bet: {market_type}{period_suffix} - {outcome} with odds {odds} (EV: {ev:.2f}%)")
@@ -2301,7 +2308,7 @@ class BetEngine(WebsiteOpener):
                         modified_shaped_data["periodNumber"] = "1"
                     
                     # Place the bet
-                    success = self.__place_bet(event_details, market_type, outcome, odds, modified_shaped_data, is_first_half)
+                    success = self.__place_bet(event_details, market_type, outcome, odds, modified_shaped_data, is_first_half, stake)
                     if success:
                         bets_placed += 1
                         logger.info(f"Successfully placed bet on {market_type}{period_suffix} - {outcome}")
@@ -2336,7 +2343,7 @@ class BetEngine(WebsiteOpener):
         Returns:
         - Tuple of (bet_code, odds, adjusted_points)
         """
-        logger.info(f"sport id {sport_id}")
+        # logger.info(f"sport id {sport_id}")
         logger.info(f"Finding market for Game: {home_team} vs {away_team}: {line_type} - {outcome} - {points} - First Half: {is_first_half} - Sport: {'Basketball' if sport_id == 3 or sport_id == "3" else 'Soccer'}")
         
         if "markets" not in event_details:
@@ -2347,7 +2354,7 @@ class BetEngine(WebsiteOpener):
         
         # Use different market names based on sport
         is_basketball = (sport_id == "3" or sport_id == 3)
-        logger.info(f"is basketball: {is_basketball}")
+        # logger.info(f"is basketball: {is_basketball}")
         
         # Determine the correct market descriptions based on is_first_half
         if is_first_half:
@@ -2363,7 +2370,7 @@ class BetEngine(WebsiteOpener):
             spread_market = "asian handicap"
             dnb_market = "dnb"
         
-        logger.info(f"Looking for markets: moneyline='{moneyline_market}', total='{total_market}', spread='{spread_market}', dnb='{dnb_market}'")
+        # logger.info(f"Looking for markets: moneyline='{moneyline_market}', total='{total_market}', spread='{spread_market}', dnb='{dnb_market}'")
 
         # Handle MONEYLINE bets (1X2 in MSport)
         if line_type.lower() == "money_line":
@@ -2403,7 +2410,7 @@ class BetEngine(WebsiteOpener):
             
             # Round to nearest 0.5 increment first (e.g., 1.25 -> 1.5, 1.3 -> 1.5, 1.7 -> 1.5)
             rounded_points = round(original_points * 2) / 2
-            logger.info(f"Original points: {original_points}, Rounded to nearest 0.5: {rounded_points}")
+            # logger.info(f"Original points: {original_points}, Rounded to nearest 0.5: {rounded_points}")
             
             # Generate alternate lines to search for (4 steps up and down with 0.5 increments)
             alternate_points = []
@@ -2412,16 +2419,17 @@ class BetEngine(WebsiteOpener):
             alternate_points.append(rounded_points)
             
             # Add 4 steps upward (0.5, 1.0, 1.5, 2.0 higher)
-            for i in range(1, 5):
-                alternate_points.append(rounded_points + (i * 0.5))
+            # FOR NOW REM OVE THIS SINCE WE ARE MANUALLY PASSING IT
+            # for i in range(1, 5):
+            #     alternate_points.append(rounded_points + (i * 0.5))
             
             # Add 4 steps downward (0.5, 1.0, 1.5, 2.0 lower), but not below 0
-            for i in range(1, 5):
-                lower_point = rounded_points - (i * 0.5)
-                if lower_point >= 0:  # Don't go below 0
-                    alternate_points.append(lower_point)
+            # for i in range(1, 5):
+            #     lower_point = rounded_points - (i * 0.5)
+            #     if lower_point >= 0:  # Don't go below 0
+            #         alternate_points.append(lower_point)
             
-            logger.info(f"Searching for total points in order: {alternate_points}")
+            # logger.info(f"Searching for total points in order: {alternate_points}")
             
             # Find Over/Under markets and look for the closest points from our alternate list
             best_match = None
@@ -2520,7 +2528,7 @@ class BetEngine(WebsiteOpener):
             
             # Round to nearest 0.5 increment first (e.g., -0.25 -> -0.5, +1.3 -> +1.5, -1.7 -> -1.5)
             rounded_points = round(original_points * 2) / 2
-            logger.info(f"Original handicap: {original_points}, Rounded to nearest 0.5: {rounded_points}")
+            # logger.info(f"Original handicap: {original_points}, Rounded to nearest 0.5: {rounded_points}")
             
             # Generate alternate handicap lines to search for (4 steps in each direction with 0.5 increments)
             alternate_points = []
@@ -2529,30 +2537,30 @@ class BetEngine(WebsiteOpener):
             alternate_points.append(rounded_points)
             
             # Add 4 steps in positive direction (towards 0 if negative, away from 0 if positive)
-            if rounded_points < 0:
-                # For negative handicaps, go towards 0 (less negative)
-                for i in range(1, 5):
-                    new_point = rounded_points + (i * 0.5)
-                    if new_point <= 0:  # Don't cross zero for negative handicaps
-                        alternate_points.append(new_point)
-            else:
-                # For positive handicaps, go away from 0 (more positive)
-                for i in range(1, 5):
-                    alternate_points.append(rounded_points + (i * 0.5))
+            # if rounded_points < 0:
+            #     # For negative handicaps, go towards 0 (less negative)
+            #     for i in range(1, 5):
+            #         new_point = rounded_points + (i * 0.5)
+            #         if new_point <= 0:  # Don't cross zero for negative handicaps
+            #             alternate_points.append(new_point)
+            # else:
+            #     # For positive handicaps, go away from 0 (more positive)
+            #     for i in range(1, 5):
+            #         alternate_points.append(rounded_points + (i * 0.5))
             
-            # Add 4 steps in negative direction (away from 0 if negative, towards 0 if positive)
-            if rounded_points < 0:
-                # For negative handicaps, go away from 0 (more negative)
-                for i in range(1, 5):
-                    alternate_points.append(rounded_points - (i * 0.5))
-            else:
-                # For positive handicaps, go towards 0 (less positive)
-                for i in range(1, 5):
-                    new_point = rounded_points - (i * 0.5)
-                    if new_point >= 0:  # Don't cross zero for positive handicaps
-                        alternate_points.append(new_point)
+            # # Add 4 steps in negative direction (away from 0 if negative, towards 0 if positive)
+            # if rounded_points < 0:
+            #     # For negative handicaps, go away from 0 (more negative)
+            #     for i in range(1, 5):
+            #         alternate_points.append(rounded_points - (i * 0.5))
+            # else:
+            #     # For positive handicaps, go towards 0 (less positive)
+            #     for i in range(1, 5):
+            #         new_point = rounded_points - (i * 0.5)
+            #         if new_point >= 0:  # Don't cross zero for positive handicaps
+            #             alternate_points.append(new_point)
             
-            logger.info(f"Searching for handicap points in order: {alternate_points}")
+            # logger.info(f"Searching for handicap points in order: {alternate_points}")
             
             # Find Asian Handicap markets and look for the closest points from our alternate list
             best_match = None
@@ -2644,7 +2652,7 @@ class BetEngine(WebsiteOpener):
         """Destructor to ensure browser is closed when object is garbage collected"""
         self.cleanup()
 
-    def __place_bet(self, event_details, line_type, outcome, odds, modified_shaped_data, is_first_half=False):
+    def __place_bet(self, event_details, line_type, outcome, odds, modified_shaped_data, is_first_half=False, stake=None):
         """
         Place a bet on MSport
         
@@ -2674,6 +2682,7 @@ class BetEngine(WebsiteOpener):
                 "odds": odds,
                 "shaped_data": modified_shaped_data,
                 "is_first_half": is_first_half,
+                "stake": stake,  # Include pre-calculated stake
                 "timestamp": time.time()
             }
             
@@ -2700,6 +2709,7 @@ class BetEngine(WebsiteOpener):
                 "odds": odds,
                 "shaped_data": modified_shaped_data,
                 "is_first_half": is_first_half,
+                "stake": stake,  # Include pre-calculated stake
                 "timestamp": time.time()
             }
             
@@ -3075,6 +3085,188 @@ class BetEngine(WebsiteOpener):
         except Exception as e:
             logger.error(f"Error restarting browser: {e}")
             raise
+
+    def __calculate_stake(self, bet_odds, shaped_data, bankroll):
+        """
+        Calculate the stake amount based on Kelly criterion
+        
+        Parameters:
+        - bet_odds: The decimal odds offered by MSport
+        - shaped_data: The data with prices and outcome information
+        
+        Returns:
+        - Recommended stake amount (rounded to human-like values)
+        """
+        # Get the stored decimal prices and outcome key
+        decimal_prices = shaped_data.get("_decimal_prices", {})
+        outcome_key = shaped_data.get("_outcome_key", "")
+        
+        if not decimal_prices or not outcome_key:
+            logger.info("Missing required data for stake calculation")
+            return self.__round_stake_humanlike(10)  # Default stake if calculation not possible
+        
+        # Extract values into a list for power method
+        odds_values = list(decimal_prices.values())
+        if not odds_values:
+            return self.__round_stake_humanlike(10)  # Default stake
+        
+        # Calculate fair probabilities using power method
+        fair_probs = self.__power_method_devig(odds_values)
+        
+        # Map the probabilities back to their outcomes
+        outcome_probs = {}
+        for i, (outcome, _) in enumerate(decimal_prices.items()):
+            if i < len(fair_probs):
+                outcome_probs[outcome] = fair_probs[i]
+        
+        # Get the probability for our specific outcome
+        if outcome_key not in outcome_probs:
+            logger.info(f"Outcome {outcome_key} not found in probabilities")
+            return self.__round_stake_humanlike(10)  # Default stake
+            
+        outcome_prob = outcome_probs[outcome_key]
+        
+        
+        # Calculate Kelly stake
+        full_kelly = self.__kelly_stake(outcome_prob, bet_odds, bankroll)
+        
+        # Use 30% of Kelly as a more conservative approach
+        fractional_kelly = full_kelly * 0.3
+        
+        # Get odds-based stake limits
+        min_stake, max_stake = self.__get_stake_limits_for_odds(bet_odds)
+        
+        stake = max(min_stake, min(fractional_kelly, max_stake))
+        
+        # Round to human-like amounts
+        rounded_stake = self.__round_stake_humanlike(stake)
+        
+        logger.info(f"Probability: {outcome_prob:.4f}, Full Kelly: {full_kelly:.2f}, "
+              f"Fractional Kelly (30%): {fractional_kelly:.2f}, Calculated Stake: {stake:.2f}, "
+              f"Rounded Stake: {rounded_stake:.2f}")
+        
+        return rounded_stake
+    
+    def __calculate_stake_for_market(self, bet_odds, shaped_data, bankroll):
+        """
+        Calculate the stake amount for a specific market based on pre-calculated EV data
+        
+        Parameters:
+        - bet_odds: The decimal odds offered by MSport
+        - shaped_data: The data with pre-calculated prices and outcome information
+        
+        Returns:
+        - Recommended stake amount (rounded to human-like values)
+        """
+        # Get the stored decimal prices and outcome key from EV calculation
+        decimal_prices = shaped_data.get("_decimal_prices", {})
+        outcome_key = shaped_data.get("_outcome_key", "")
+        
+        if not decimal_prices or not outcome_key:
+            logger.info("Missing required data for stake calculation")
+            return self.__round_stake_humanlike(10)  # Default stake if calculation not possible
+        
+        # Extract values into a list for power method
+        odds_values = list(decimal_prices.values())
+        if not odds_values:
+            return self.__round_stake_humanlike(10)  # Default stake
+        
+        # Calculate fair probabilities using power method
+        fair_probs = self.__power_method_devig(odds_values)
+        
+        # Map the probabilities back to their outcomes
+        outcome_probs = {}
+        for i, (outcome, _) in enumerate(decimal_prices.items()):
+            if i < len(fair_probs):
+                outcome_probs[outcome] = fair_probs[i]
+        
+        # Get the probability for our specific outcome
+        if outcome_key not in outcome_probs:
+            logger.info(f"Outcome {outcome_key} not found in probabilities")
+            return self.__round_stake_humanlike(10)  # Default stake
+            
+        outcome_prob = outcome_probs[outcome_key]
+        
+        # Calculate Kelly stake
+        full_kelly = self.__kelly_stake(outcome_prob, bet_odds, bankroll)  # Use default bankroll of 1000
+        
+        # Use 30% of Kelly as a more conservative approach
+        fractional_kelly = full_kelly * 0.3
+        
+        # Get odds-based stake limits
+        min_stake, max_stake = self.__get_stake_limits_for_odds(bet_odds)
+        
+        stake = max(min_stake, min(fractional_kelly, max_stake))
+        
+        # Round to human-like amounts
+        rounded_stake = self.__round_stake_humanlike(stake)
+        
+        logger.info(f"Probability: {outcome_prob:.4f}, Full Kelly: {full_kelly:.2f}, "
+              f"Fractional Kelly (30%): {fractional_kelly:.2f}, Calculated Stake: {stake:.2f}, "
+              f"Rounded Stake: {rounded_stake:.2f}")
+        
+        return rounded_stake
+
+    def __calculate_stake(self, bet_odds, shaped_data, bankroll):
+        """
+        Calculate the stake amount based on Kelly criterion
+        
+        Parameters:
+        - bet_odds: The decimal odds offered by MSport
+        - shaped_data: The data with prices and outcome information
+        
+        Returns:
+        - Recommended stake amount (rounded to human-like values)
+        """
+        # Get the stored decimal prices and outcome key
+        decimal_prices = shaped_data.get("_decimal_prices", {})
+        outcome_key = shaped_data.get("_outcome_key", "")
+        
+        if not decimal_prices or not outcome_key:
+            logger.info("Missing required data for stake calculation")
+            return self.__round_stake_humanlike(10)  # Default stake if calculation not possible
+        
+        # Extract values into a list for power method
+        odds_values = list(decimal_prices.values())
+        if not odds_values:
+            return self.__round_stake_humanlike(10)  # Default stake
+        
+        # Calculate fair probabilities using power method
+        fair_probs = self.__power_method_devig(odds_values)
+        
+        # Map the probabilities back to their outcomes
+        outcome_probs = {}
+        for i, (outcome, _) in enumerate(decimal_prices.items()):
+            if i < len(fair_probs):
+                outcome_probs[outcome] = fair_probs[i]
+        
+        # Get the probability for our specific outcome
+        if outcome_key not in outcome_probs:
+            logger.info(f"Outcome {outcome_key} not found in probabilities")
+            return self.__round_stake_humanlike(10)  # Default stake
+            
+        outcome_prob = outcome_probs[outcome_key]
+        
+        
+        # Calculate Kelly stake
+        full_kelly = self.__kelly_stake(outcome_prob, bet_odds, bankroll)
+        
+        # Use 30% of Kelly as a more conservative approach
+        fractional_kelly = full_kelly * 0.3
+        
+        # Get odds-based stake limits
+        min_stake, max_stake = self.__get_stake_limits_for_odds(bet_odds)
+        
+        stake = max(min_stake, min(fractional_kelly, max_stake))
+        
+        # Round to human-like amounts
+        rounded_stake = self.__round_stake_humanlike(stake)
+        
+        logger.info(f"Probability: {outcome_prob:.4f}, Full Kelly: {full_kelly:.2f}, "
+              f"Fractional Kelly (30%): {fractional_kelly:.2f}, Calculated Stake: {stake:.2f}, "
+              f"Rounded Stake: {rounded_stake:.2f}")
+        
+        return rounded_stake
 
 if __name__ == "__main__":
     """Main Application
