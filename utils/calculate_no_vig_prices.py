@@ -180,9 +180,9 @@ def calculate_no_vig_prices(decimal_prices: Dict[str, Optional[Number]]) -> Dict
 if __name__ == "__main__":
     # Example with 3-way market (home/draw/away)
     sample_odds = {
-        'home': 3, 
-        # 'draw': 0,
-        'away': 1.296
+        'home': 3.38, 
+        'draw': 3.25,
+        'away': 2.11
     }
     
     no_vig_prices = calculate_no_vig_prices(sample_odds)

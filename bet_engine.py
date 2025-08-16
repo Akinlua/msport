@@ -1716,6 +1716,7 @@ class BetEngine(WebsiteOpener):
         Returns:
         - EV percentage
         """
+        logger.info(f"Shaped data used for calculating ev {shaped_data}")
         line_type = shaped_data["category"]["type"].lower()
         outcome = shaped_data["category"]["meta"]["team"]
         points = shaped_data["category"]["meta"].get("value")
@@ -1797,7 +1798,7 @@ class BetEngine(WebsiteOpener):
             
         # Calculate EV
         ev = calculate_ev(bet_odds, true_price)
-        logger.info(f"Bet odds: {bet_odds}, True price: {true_price}, EV: {ev:.2f}%")
+        logger.info(f"Bet odds: {bet_odds}, outcome: {outcome_key}, True price: {true_price}, EV: {ev:.2f}%")
         
         return ev
         
