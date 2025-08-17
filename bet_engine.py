@@ -721,7 +721,7 @@ class BetEngine(WebsiteOpener):
         variant_indicators = ["ladies", "women", "u21", "u-21", "u23", "u-23", "youth", "junior", "reserve", "b team"]
         
         for search_term in search_strategies:
-            logger.info(f"Trying search term: {search_term}")
+            # logger.info(f"Trying search term: {search_term}")
             
             try:
                 # MSport search endpoint
@@ -739,10 +739,10 @@ class BetEngine(WebsiteOpener):
                     "Operid": "2"
                 }
                 
-                logger.info(f"Searching with URL: {search_url} and params: {params}")
+                # logger.info(f"Searching with URL: {search_url} and params: {params}")
                 response = requests.get(search_url, params=params, headers=headers)
                 
-                logger.info(f"Response status: {response.status_code}")
+                # logger.info(f"Response status: {response.status_code}")
                 # print(f"Response content: {response.text[:500]}...")
                 if response.status_code == 200:
                     try:
@@ -827,7 +827,7 @@ class BetEngine(WebsiteOpener):
                                 "home_team": event.get('homeTeam'),
                                 "away_team": event.get('awayTeam')
                             })
-                            logger.info(f"Potential match: {event_name} (Score: {match_score})")
+                            # logger.info(f"Potential match: {event_name} (Score: {match_score})")
                     else:
                         logger.info(f"No data found in search response for term: {search_term}")
                 else:
@@ -1077,9 +1077,10 @@ class BetEngine(WebsiteOpener):
                 
                 # Execute the JavaScript with the stake value
                 result = self.driver.execute_script(stake_js_script, str(10))
+                # result = self.driver.execute_script(stake_js_script, str(stake))
                 
                 if result:
-                    logger.info(f"✅ Successfully entered stake: 10 using JavaScript")
+                    logger.info(f"✅ Successfully entered stake: {stake} using JavaScript")
                     # time.sleep(1)
                 else:
                     logger.error("❌ JavaScript stake input failed, trying fallback methods")
@@ -1112,7 +1113,7 @@ class BetEngine(WebsiteOpener):
                     # time.sleep(0.5)
                     # stake_input.send_keys(str(stake))
                     stake_input.send_keys(str(10))
-                    logger.info(f"Entered stake using Selenium fallback: 10")
+                    logger.info(f"Entered stake using Selenium fallback: {stake}")
                     # time.sleep(1)
                 
             except Exception as e:
@@ -1734,39 +1735,14 @@ class BetEngine(WebsiteOpener):
         # Fetch latest odds from Pinnacle API if event ID is available
         latest_prices = self.__fetch_latest_pinnacle_odds(event_id, line_type, points, outcome, period_key)
         
-        # If we couldn't get latest odds, fall back to the ones in shaped_data
+        # If we couldn't get latest odds, return -100 EV instead of using fallback
         if not latest_prices:
-            logger.info("Using odds from original alert as fallback")
-            # Get prices from shaped_data based on line type
-            if line_type == "money_line":
-                # For moneyline, we use home, away, and draw prices
-                decimal_prices = {}
-                if "priceHome" in shaped_data:
-                    decimal_prices["home"] = float(shaped_data["priceHome"])
-                if "priceAway" in shaped_data:
-                    decimal_prices["away"] = float(shaped_data["priceAway"])
-                if "priceDraw" in shaped_data:
-                    decimal_prices["draw"] = float(shaped_data["priceDraw"])
-                    
-            elif line_type == "total":
-                # For totals, we map over/under to home/away
-                decimal_prices = {}
-                if "priceOver" in shaped_data:
-                    decimal_prices["home"] = float(shaped_data["priceOver"])  # Over as home
-                if "priceUnder" in shaped_data:
-                    decimal_prices["away"] = float(shaped_data["priceUnder"])  # Under as away
-                    
-            elif line_type == "spread":
-                # For spread, we use home and away prices
-                decimal_prices = {}
-                if "priceHome" in shaped_data:
-                    decimal_prices["home"] = float(shaped_data["priceHome"])
-                if "priceAway" in shaped_data:
-                    decimal_prices["away"] = float(shaped_data["priceAway"])
-        else:
-            # Use the latest prices we fetched
-            decimal_prices = latest_prices
-            logger.info(f"Using latest Pinnacle odds: {decimal_prices}")
+            logger.info("No latest Pinnacle odds available, returning -100 EV")
+            return -100  # Return negative EV instead of fallback
+        
+        # Use the latest prices we fetched
+        decimal_prices = latest_prices
+        logger.info(f"Using latest Pinnacle odds: {decimal_prices}")
         
         # Store the prices for later use in stake calculation
         shaped_data["_decimal_prices"] = decimal_prices
@@ -1878,52 +1854,52 @@ class BetEngine(WebsiteOpener):
             elif line_type == "spread":
                 spreads = period.get("spreads", {})
                 if spreads:  # Check if spreads data exists
-                    # Find the closest spread to the points value
-                    closest_spread = None
-                    min_diff = float('inf')
+                    # Look for exact spread points match
+                    exact_spread = None
                     
                     for spread_key, spread_data in spreads.items():
                         try:
                             spread_points = float(spread_data.get("hdp", 0))
-                            diff = abs(float(points) - spread_points)
-                            
-                            if diff < min_diff:
-                                min_diff = diff
-                                closest_spread = spread_data
+                            # Only check for exact match, no closest approximation
+                            if abs(spread_points - float(points)) < 0.01:  # Exact match with small tolerance
+                                exact_spread = spread_data
+                                break
                         except (ValueError, TypeError):
                             continue
                     
-                    if closest_spread:
-                        if "home" in closest_spread:
-                            decimal_prices["home"] = float(closest_spread["home"])
-                        if "away" in closest_spread:
-                            decimal_prices["away"] = float(closest_spread["away"])
+                    if exact_spread:
+                        if "home" in exact_spread:
+                            decimal_prices["home"] = float(exact_spread["home"])
+                        if "away" in exact_spread:
+                            decimal_prices["away"] = float(exact_spread["away"])
+                    else:
+                        logger.info(f"No exact spread match found for points: {points}")
                 else:
                     logger.info("No spreads data found in period")
                     
             elif line_type == "total":
                 totals = period.get("totals", {})
                 if totals:  # Check if totals data exists
-                    # Find the closest total to the points value
-                    closest_total = None
-                    min_diff = float('inf')
+                    # Look for exact total points match
+                    exact_total = None
                     
                     for total_key, total_data in totals.items():
                         try:
                             total_points = float(total_data.get("points", 0))
-                            diff = abs(float(points) - total_points)
-                            
-                            if diff < min_diff:
-                                min_diff = diff
-                                closest_total = total_data
+                            # Only check for exact match, no closest approximation
+                            if abs(total_points - float(points)) < 0.01:  # Exact match with small tolerance
+                                exact_total = total_data
+                                break
                         except (ValueError, TypeError):
                             continue
                     
-                    if closest_total:
-                        if "over" in closest_total:
-                            decimal_prices["home"] = float(closest_total["over"])  # Over as home
-                        if "under" in closest_total:
-                            decimal_prices["away"] = float(closest_total["under"])  # Under as away
+                    if exact_total:
+                        if "over" in exact_total:
+                            decimal_prices["home"] = float(exact_total["over"])  # Over as home
+                        if "under" in exact_total:
+                            decimal_prices["away"] = float(exact_total["under"])  # Under as away
+                    else:
+                        logger.info(f"No exact total match found for points: {points}")
                 else:
                     logger.info("No totals data found in period")
             
